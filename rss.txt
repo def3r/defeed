@@ -1,4 +1,5 @@
 https://daniel.haxx.se/blog/feed/
+https://xkcd.com/rss.xml
 https://www.stephendiehl.com/feed.xml
 https://www.seantallen.com/index.xml
 https://mo.io/rss.xml

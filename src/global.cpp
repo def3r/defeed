@@ -1,3 +1,5 @@
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 
 #include <curl/curl.h>
@@ -39,4 +41,22 @@ void DefeedCtx::init() {
   rss = defeed + "/rss";
   rss_txt = rss + ".txt";
   rss_info = rss + ".info";
+}
+
+void DefeedCtx::setup_dirs() {
+  namespace fs = std::filesystem;
+  fs::path defeed_dir{DefeedCtx::defeed};
+  if (!fs::is_directory(defeed_dir)) {
+    std::cout << "defeed dir not found, initializing defeed." << std::endl;
+    if (!fs::create_directory(defeed_dir)) {
+      std::cerr << "Unable to create dir: " << defeed_dir << std::endl;
+      std::exit(1);
+    }
+    if (!fs::create_directory(DefeedCtx::rss)) {
+      std::cerr << "Unable to create dir: " << defeed_dir << std::endl;
+      std::exit(1);
+    }
+    std::ofstream rss_file{DefeedCtx::rss_txt};
+    rss_file.close();
+  }
 }

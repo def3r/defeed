@@ -2,19 +2,17 @@
 
 #include <string>
 
-class CurlGlobal {
-private:
-  CurlGlobal();
-
-public:
+struct CurlGlobal {
   static void init();
   static void cleanup();
+
+private:
+  CurlGlobal();
 };
 
-class DefeedCtx {
-public:
+struct DefeedCtx {
   static inline std::string home{}, defeed{};
   static inline std::string rss{}, rss_txt{}, rss_info{};
-
   static void init();
+  static void setup_dirs();
 };

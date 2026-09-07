@@ -55,14 +55,12 @@ int main(int argc, char *argv[]) {
     if (!url.empty()) {
       std::cout << url << "\t\t" << std::hash<std::string>{}(url) << std::endl;
       rss_urls.push_back({url, std::hash<std::string>{}(url)});
-      // mf.add(url);
     }
   }
   rss_txt.close();
 
   MultiFetcher fetch_rss{};
   MultiFetcher cond_fetch_rss{};
-  cond_fetch_rss.reset_override_file();
   for (auto [url, hash] : rss_urls) {
     std::filesystem::path url_path{DefeedCtx::rss + "/" + std::to_string(hash)};
     if (!std::filesystem::is_directory(url_path)) {
@@ -88,8 +86,6 @@ int main(int argc, char *argv[]) {
 
   fetch_rss.perform_write();
   cond_fetch_rss.perform_write();
-
-  // mf.perform_write("outfile_");
 
   // Create a simple document with three text elements.
   Element document = hbox({

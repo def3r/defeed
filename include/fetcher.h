@@ -5,8 +5,6 @@
 
 #include <curl/curl.h>
 
-#include "global.h"
-
 class MultiFetcher;
 
 class Fetcher {
@@ -29,7 +27,7 @@ private:
   CURL *curl;
   CURLcode res;
   std::string url;
-  std::string url_hash;
+  size_t url_hash;
   struct curl_slist *headers;
 
   static size_t write_cb(char *ptr, size_t size, size_t nmemb, void *stream);
@@ -51,12 +49,10 @@ public:
   bool perform_write();
   void append_headers(const std::string &header_str);
   void update_fetcher_headers();
-  void reset_override_file();
 
 private:
   CURLM *multi;
   std::vector<Fetcher> fetchers;
   std::vector<size_t> hash;
   struct curl_slist *headers = NULL;
-  bool override_file = true;
 };

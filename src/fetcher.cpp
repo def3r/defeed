@@ -1,3 +1,5 @@
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
@@ -12,6 +14,7 @@
 
 class MultiFetcher;
 
+// BUG: How do we set url and url_hash in this case?
 Fetcher::Fetcher() { init_common(); }
 
 // RAII obj, steal on move, delete on copy
@@ -19,6 +22,7 @@ Fetcher::Fetcher() { init_common(); }
 Fetcher::Fetcher(Fetcher &&other) noexcept {
   this->curl = other.curl;
   this->url = other.url;
+  this->url_hash = other.url_hash;
   this->headers = other.headers;
 
   other.curl = nullptr;
@@ -30,6 +34,7 @@ Fetcher &Fetcher::operator=(Fetcher &&other) noexcept {
   if (this != &other) {
     this->curl = other.curl;
     this->url = other.url;
+    this->url_hash = other.url_hash;
     this->headers = other.headers;
 
     other.curl = nullptr;
@@ -38,7 +43,8 @@ Fetcher &Fetcher::operator=(Fetcher &&other) noexcept {
   return *this;
 }
 
-Fetcher::Fetcher(const std::string &url) : url(url) {
+Fetcher::Fetcher(const std::string &url)
+    : url(url), url_hash(std::hash<std::string>{}(url)) {
   init_common();
   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
 }
@@ -87,13 +93,34 @@ size_t Fetcher::header_callback(char *buffer, size_t size, size_t nitems,
   if (userdata == nullptr)
     return n;
   size_t hash = *static_cast<size_t *>(userdata);
+  if (hash == 0) {
+    // Already recieved a 304 Not Modified; skip
+    return n;
+  }
 
   char temp[n - 1]; // ignore \r\n
   std::memcpy(temp, buffer, n - 2);
   temp[n - 2] = '\0';
   std::string res{temp};
 
+  size_t http = res.find("HTTP");
+  if (http != std::string::npos) {
+    size_t second = res.find_first_of(" ");
+    // if we cant find the code, something went terribly wrong
+    if (second == std::string::npos) {
+      std::cerr << "Cant find status code in the header: " << res << std::endl;
+      std::abort();
+    }
+    // feed 304 Not Modified; early exit
+    if (res.substr(second + 1, 3) == "304") {
+      std::cout << "hash\t" << hash << "\t304 Not Modified" << std::endl;
+      *static_cast<size_t *>(userdata) = 0;
+      return n;
+    }
+  }
+
   size_t pos = res.find("etag: ");
+  pos = (pos == std::string::npos) ? res.find("ETag: ") : pos;
   if (pos != std::string::npos) {
     std::filesystem::path url_path{DefeedCtx::rss + "/" + std::to_string(hash)};
     // At this point we assume all the dirs have been setup
@@ -105,6 +132,8 @@ size_t Fetcher::header_callback(char *buffer, size_t size, size_t nitems,
     std::cout << "For hash: " << hash << " \t" << res.substr(pos + 6)
               << std::endl;
     etag_file.close();
+  } else if ((pos = res.find("last")) != std::string::npos) {
+    // TODO: fallback to Last-Modified: field
   }
   return n;
 }
@@ -187,9 +216,8 @@ bool MultiFetcher::perform_write() {
 
   for (size_t i = 0; i < fetchers.size(); i++) {
     std::string fname{DefeedCtx::rss + "/" + std::to_string(hash[i]) +
-                      "/rssfeed.txt"};
-    FILE *pagefile = override_file ? std::fopen(fname.c_str(), "wb")
-                                   : std::fopen(fname.c_str(), "ab");
+                      "/new_rssfeed.txt"};
+    FILE *pagefile = std::fopen(fname.c_str(), "wb");
     if (!pagefile) {
       std::cerr << "Unable to open file: " << fname << std::endl;
       return false;
@@ -214,13 +242,29 @@ bool MultiFetcher::perform_write() {
   } while (still_running);
 
   for (size_t i = 0; i < fetchers.size(); i++) {
-    fclose(fps[i]);
+    long pos = std::ftell(fps[i]);
+    std::fclose(fps[i]);
+    std::string dname{DefeedCtx::rss + "/" +
+                      std::to_string(fetchers[i].url_hash)};
+    std::string mv_name{dname + "/new_rssfeed.txt"};
+    if (pos != 0) {
+      std::string rm_name{dname + "/rssfeed.txt"};
+      if (std::remove(rm_name.c_str()) != 0) {
+        std::cerr << "Unable to rm file: " << rm_name << std::endl;
+      }
+      if (std::rename(mv_name.c_str(), rm_name.c_str()) != 0) {
+        std::cerr << "Unable to rename file: " << mv_name << " to " << rm_name
+                  << std::endl;
+      }
+    } else if (std::remove(mv_name.c_str()) != 0) {
+      std::cerr << "Unable to rm file: " << mv_name << std::endl;
+    }
   }
 
   return true;
 }
 
-void MultiFetcher ::append_headers(const std::string &header_str) {
+void MultiFetcher::append_headers(const std::string &header_str) {
   this->headers = curl_slist_append(headers, header_str.c_str());
 }
 
@@ -229,5 +273,3 @@ void MultiFetcher::update_fetcher_headers() {
     fetcher.update_headers(headers);
   }
 }
-
-void MultiFetcher::reset_override_file() { override_file = false; }

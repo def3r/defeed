@@ -249,7 +249,8 @@ public:
     for (size_t i = 0; i < fetchers.size(); i++) {
       std::string fname{DefeedCtx::rss + "/" + std::to_string(hash[i]) +
                         "/rssfeed.txt"};
-      FILE *pagefile = fopen(fname.c_str(), "wb");
+      FILE *pagefile = override_file ? std::fopen(fname.c_str(), "wb")
+                                     : std::fopen(fname.c_str(), "ab");
       if (!pagefile) {
         std::cerr << "Unable to open file: " << fname << std::endl;
         return false;
@@ -291,11 +292,14 @@ public:
     }
   }
 
+  void reset_override_file() { override_file = false; }
+
 private:
   CURLM *multi;
   std::vector<Fetcher> fetchers;
   std::vector<size_t> hash;
   struct curl_slist *headers = NULL;
+  bool override_file = true;
 };
 
 void defeed_setup() {
@@ -343,6 +347,7 @@ int main(int argc, char *argv[]) {
 
   MultiFetcher fetch_rss{};
   MultiFetcher cond_fetch_rss{};
+  cond_fetch_rss.reset_override_file();
   for (auto [url, hash] : rss_urls) {
     std::filesystem::path url_path{DefeedCtx::rss + "/" + std::to_string(hash)};
     if (!std::filesystem::is_directory(url_path)) {

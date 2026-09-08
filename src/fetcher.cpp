@@ -12,9 +12,12 @@
 #include "fetcher.h"
 #include "global.h"
 
-class MultiFetcher;
+struct UserData {
+  size_t hash;
+  std::string etag;
+};
 
-// BUG: How do we set url and url_hash in this case?
+// BUG: How do we set url, etag and url_hash in this case?
 Fetcher::Fetcher() { init_common(); }
 
 // RAII obj, steal on move, delete on copy
@@ -24,6 +27,7 @@ Fetcher::Fetcher(Fetcher &&other) noexcept {
   this->url = other.url;
   this->url_hash = other.url_hash;
   this->headers = other.headers;
+  this->etag = other.etag;
 
   other.curl = nullptr;
   other.headers = nullptr;
@@ -36,6 +40,7 @@ Fetcher &Fetcher::operator=(Fetcher &&other) noexcept {
     this->url = other.url;
     this->url_hash = other.url_hash;
     this->headers = other.headers;
+    this->etag = other.etag;
 
     other.curl = nullptr;
     other.headers = nullptr;
@@ -45,6 +50,12 @@ Fetcher &Fetcher::operator=(Fetcher &&other) noexcept {
 
 Fetcher::Fetcher(const std::string &url)
     : url(url), url_hash(std::hash<std::string>{}(url)) {
+  init_common();
+  curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+}
+
+Fetcher::Fetcher(const std::string &url, const std::string &etag)
+    : url(url), url_hash(std::hash<std::string>{}(url)), etag(etag) {
   init_common();
   curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
 }
@@ -92,8 +103,8 @@ size_t Fetcher::header_callback(char *buffer, size_t size, size_t nitems,
 
   if (userdata == nullptr)
     return n;
-  size_t hash = *static_cast<size_t *>(userdata);
-  if (hash == 0) {
+  UserData *ud = static_cast<UserData *>(userdata);
+  if (ud->hash == 0) {
     // Already recieved a 304 Not Modified; skip
     return n;
   }
@@ -113,8 +124,8 @@ size_t Fetcher::header_callback(char *buffer, size_t size, size_t nitems,
     }
     // feed 304 Not Modified; early exit
     if (res.substr(second + 1, 3) == "304") {
-      std::cout << "hash\t" << hash << "\t304 Not Modified" << std::endl;
-      *static_cast<size_t *>(userdata) = 0;
+      std::cout << "hash\t" << ud->hash << "\t304 Not Modified" << std::endl;
+      ud->hash = 0;
       return n;
     }
   }
@@ -122,15 +133,29 @@ size_t Fetcher::header_callback(char *buffer, size_t size, size_t nitems,
   size_t pos = res.find("etag: ");
   pos = (pos == std::string::npos) ? res.find("ETag: ") : pos;
   if (pos != std::string::npos) {
-    std::filesystem::path url_path{DefeedCtx::rss + "/" + std::to_string(hash)};
+    std::filesystem::path url_path{DefeedCtx::rss + "/" +
+                                   std::to_string(ud->hash)};
+    std::string new_etag = res.substr(pos + 6);
+
+    // Sometimes it may happen that server returns 200 OK even tho the etags
+    // match because it may happen that CDN may have a cache miss and it ignores
+    // the 'If-None-Match' thing in the header
+    if (new_etag == ud->etag) {
+      std::cout << "Returned 200 but etag not modified for " << ud->hash
+                << std::endl;
+      ud->hash = 0;
+      return n;
+    }
+
     // At this point we assume all the dirs have been setup
     if (!std::filesystem::is_directory(url_path)) {
       std::abort();
     }
     std::ofstream etag_file{url_path.string() + "/etag"};
-    etag_file << res.substr(pos + 6);
-    std::cout << "For hash: " << hash << " \t" << res.substr(pos + 6)
-              << std::endl;
+    etag_file << new_etag;
+    std::cout << "ETag modified for hash: " << ud->hash
+              << "\t new ETag: " << new_etag << std::endl;
+    std::cout << "Fetching rss feed for " << ud->hash << std::endl;
     etag_file.close();
   } else if ((pos = res.find("last")) != std::string::npos) {
     // TODO: fallback to Last-Modified: field
@@ -214,6 +239,9 @@ bool MultiFetcher::perform_write() {
     }
   }
 
+  std::vector<UserData> ud;
+  ud.reserve(fetchers.size());
+
   for (size_t i = 0; i < fetchers.size(); i++) {
     std::string fname{DefeedCtx::rss + "/" + std::to_string(hash[i]) +
                       "/new_rssfeed.txt"};
@@ -224,7 +252,8 @@ bool MultiFetcher::perform_write() {
     }
     curl_easy_setopt(fetchers[i].curl, CURLOPT_WRITEDATA, pagefile);
     fps.push_back(pagefile);
-    curl_easy_setopt(fetchers[i].curl, CURLOPT_HEADERDATA, &hash[i]);
+    ud.emplace_back((UserData){hash[i], fetchers[i].etag});
+    curl_easy_setopt(fetchers[i].curl, CURLOPT_HEADERDATA, &ud.back());
   }
 
   do {

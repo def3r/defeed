@@ -5,8 +5,6 @@
 
 #include <curl/curl.h>
 
-class MultiFetcher;
-
 class Fetcher {
   friend class MultiFetcher;
 
@@ -17,6 +15,7 @@ public:
   Fetcher(const Fetcher &) = delete;
   Fetcher &operator=(const Fetcher &) = delete;
   Fetcher(const std::string &url);
+  Fetcher(const std::string &url, const std::string &etag);
   ~Fetcher();
 
   CURLcode perform_write(const std::string &fname);
@@ -26,7 +25,7 @@ public:
 private:
   CURL *curl;
   CURLcode res;
-  std::string url;
+  std::string url, etag;
   size_t url_hash;
   struct curl_slist *headers;
 

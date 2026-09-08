@@ -2,15 +2,16 @@
 #include <cstring>
 #include <filesystem>
 #include <fstream>
-#include <ftxui/dom/elements.hpp>
-#include <ftxui/screen/screen.hpp>
 #include <functional>
+#include <iomanip>
 #include <iostream>
 #include <string>
 #include <vector>
 
 #include <curl/curl.h>
 #include <curl/multi.h>
+#include <ftxui/dom/elements.hpp>
+#include <ftxui/screen/screen.hpp>
 
 #include "fetcher.h"
 #include "global.h"
@@ -33,8 +34,9 @@ int main(int argc, char *argv[]) {
     std::string url{};
     std::getline(rss_txt, url);
     if (!url.empty()) {
-      std::cout << url << "\t\t" << std::hash<std::string>{}(url) << std::endl;
-      rss_urls.push_back({url, std::hash<std::string>{}(url)});
+      size_t hash = std::hash<std::string>{}(url);
+      std::cout << hash << "\t\t" << url << std::endl;
+      rss_urls.push_back({url, hash});
     }
   }
   rss_txt.close();
@@ -51,6 +53,8 @@ int main(int argc, char *argv[]) {
     if (!etag_file.is_open()) {
       std::cout << "Can't find etag file for " << hash << " (" << url << ")"
                 << std::endl;
+      std::cout << "\t" << "Fetching feed for " << hash << " (" << url << ")"
+                << std::endl;
       fetch_rss.add(url);
       continue;
     }
@@ -58,7 +62,9 @@ int main(int argc, char *argv[]) {
     etag_file >> etag;
     etag_file.close();
 
-    Fetcher f{url};
+    std::cout << "If-None-Match: " << etag << std::endl;
+
+    Fetcher f{url, etag};
     f.append_headers("If-None-Match: " + etag);
     f.apply_headers();
     cond_fetch_rss.add(std::move(f));

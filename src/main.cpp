@@ -7,17 +7,22 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <variant>
 #include <vector>
 
 #include <curl/curl.h>
 #include <curl/multi.h>
 #include <ftxui/dom/elements.hpp>
 #include <ftxui/screen/screen.hpp>
+#include <libxml/HTMLparser.h>
+#include <libxml/HTMLtree.h>
 #include <libxml/parser.h>
 #include <libxml/tree.h>
 
 #include "fetcher.h"
 #include "global.h"
+#include "libxml/xmlmemory.h"
+#include "libxml/xmlstring.h"
 
 static void print_element_names(xmlNode *a_node) {
   xmlNode *cur_node = NULL;
@@ -39,6 +44,171 @@ static void print_element_names(xmlNode *a_node) {
   }
 }
 
+namespace HTML {
+
+enum class NodeType { Internal, Leaf };
+using Attributes = std::unordered_map<std::string, std::string>;
+
+// Lets store NodeName as an internal attr
+// attrs["HTMLNodeName"] contains tag name
+struct NodeBase {
+  NodeType type;
+  Attributes attrs;
+};
+
+using Children = std::vector<std::unique_ptr<NodeBase>>;
+
+struct Node : public NodeBase {
+  Children children;
+
+  Node() {
+    this->type = NodeType::Internal;
+    this->attrs = {};
+  }
+
+  // TODO: Here Do we need to destroy the children explicitly?
+};
+
+struct Leaf : public NodeBase {
+  std::string content;
+
+  Leaf() {
+    this->type = NodeType::Leaf;
+    this->attrs = {};
+  }
+};
+
+// The only leaf node?
+using TEXT = Leaf;
+
+static std::unique_ptr<HTML::NodeBase> make_leaf(xmlNode *cur_node) {
+  if (cur_node == nullptr) {
+    return nullptr;
+  }
+  std::unique_ptr<HTML::Leaf> leaf = std::make_unique<HTML::Leaf>();
+  if (cur_node->type == HTML_TEXT_NODE && cur_node->content) {
+    std::cout << "\t\tTEXT: " << cur_node->content << ": "
+              << std::strlen((char *)cur_node->content) << std::endl;
+    std::string content((char *)cur_node->content);
+    if (content.find_first_not_of(" \t\n\r") == std::string::npos ||
+        content.empty()) {
+      return {};
+    }
+    leaf->content = std::string((char *)cur_node->content);
+    leaf->attrs["HTMLNodeName"] = "text";
+  }
+
+  return std::move(leaf);
+}
+
+static std::unique_ptr<HTML::NodeBase> make_internal(xmlNode *cur_node) {
+  if (cur_node == nullptr) {
+    return nullptr;
+  }
+  if (cur_node->type == XML_TEXT_NODE) {
+    std::cout << "make_internal: leaf node passed, requesting make_leaf"
+              << std::endl;
+    return make_leaf(cur_node);
+  }
+  if (cur_node->type != XML_ELEMENT_NODE) {
+    std::cout << "make_internal: node not an XML_ELEMENT_NODE" << std::endl;
+    return nullptr;
+  }
+
+  // TODO: skip html and body tags; we are not interested in storing them
+  std::string cur_node_name{(char *)cur_node->name};
+  // if (cur_node_name == "html" || cur_node_name == "body") {
+  //   return make_internal(cur_node->children);
+  // }
+
+  std::unique_ptr<HTML::Node> node_obj = std::make_unique<HTML::Node>();
+  node_obj->attrs["HTMLNodeName"] = cur_node_name;
+  xmlAttrPtr attrs = cur_node->properties;
+  for (; attrs; attrs = attrs->next) {
+    if (attrs->name) {
+      xmlChar *val = xmlGetProp(cur_node, attrs->name);
+      if (val == nullptr) {
+        std::cout << attrs->name << " << noVAL " << std::endl;
+        node_obj->attrs[std::string((char *)attrs->name)] = "";
+      } else {
+        std::cout << attrs->name << " << " << val << std::endl;
+        node_obj->attrs[std::string((char *)attrs->name)] =
+            std::string((char *)val);
+      }
+      xmlFree(val);
+    }
+  }
+  if (cur_node->content) {
+    std::cout << "make_internal: Internal node with content: "
+              << cur_node->content << std::endl;
+  }
+
+  xmlNode *node = nullptr;
+  std::unique_ptr<NodeBase> child;
+  for (node = cur_node->children; node; node = node->next) {
+    if (node->type == XML_TEXT_NODE) {
+      child = make_leaf(node);
+      if (child != nullptr) {
+        node_obj->children.emplace_back(std::move(child));
+      }
+    } else if (node->type == XML_ELEMENT_NODE) {
+      child = make_internal(node);
+      if (child != nullptr) {
+        node_obj->children.emplace_back(std::move(make_internal(node)));
+      }
+    }
+  }
+
+  return std::move(node_obj);
+}
+
+std::unique_ptr<HTML::NodeBase> extract(const xmlChar *str) {
+  if (str == nullptr) {
+    std::cout << "HTML::extract : passed nullptr for in memory str"
+              << std::endl;
+    return {};
+  }
+
+  const char *cstr = (const char *)str;
+  xmlDoc *doc = htmlReadMemory(cstr, std::strlen(cstr), NULL, "UTF-8",
+                               HTML_PARSE_NOBLANKS);
+  if (doc == nullptr) {
+    std::cerr << "HTML::extract : "
+              << "Unable to parse in memory CDATA section as html.\nDATA: "
+              << cstr << std::endl;
+    std::abort();
+  }
+  xmlNode *root = xmlDocGetRootElement(doc);
+  std::unique_ptr<NodeBase> root_node = make_internal(root);
+
+  xmlFreeDoc(doc);
+
+  return std::move(root_node);
+}
+
+void walk(HTML::NodeBase *root) {
+  if (root == nullptr) {
+    return;
+  }
+  std::cout << "\t\tHTML::" << root->attrs["HTMLNodeName"] << std::endl;
+  for (auto it = root->attrs.begin(); it != root->attrs.end(); ++it) {
+    if (it->first != "HTMLNodeName")
+      std::cout << "\t\t\t" << it->first << " = " << it->second << std::endl;
+  }
+
+  if (root->type == HTML::NodeType::Leaf) {
+    HTML::Leaf *leaf = static_cast<HTML::Leaf *>(root);
+    std::cout << "\t\tContents: " << leaf->content << std::endl;
+  } else {
+    HTML::Node *node = static_cast<HTML::Node *>(root);
+    for (int i = 0; i < node->children.size(); i++) {
+      HTML::NodeBase *child = node->children[i].get();
+      walk(child);
+    }
+  }
+}
+
+} // namespace HTML
 namespace XML {
 
 enum class NodeType { Internal, Leaf };
@@ -65,11 +235,13 @@ struct Node : public NodeBase {
 };
 
 struct Leaf : public NodeBase {
-  std::string text;
+  std::variant<std::string, std::unique_ptr<HTML::NodeBase>> content;
+  int content_idx;
 
   Leaf() {
     this->type = NodeType::Leaf;
     this->attrs = {};
+    content_idx = 0;
   }
 };
 
@@ -89,18 +261,16 @@ using Height        = Leaf;
 using GUID          = Leaf;
 // clang-format on
 
-} // namespace XML
-
-class XMLExtract {
+class Extract {
 public:
-  XMLExtract() = delete;
-  ~XMLExtract() {
+  Extract() = delete;
+  ~Extract() {
     if (doc != nullptr) {
       xmlFreeDoc(doc);
     }
   }
 
-  XMLExtract(const std::string &xml_file) {
+  Extract(const std::string &xml_file) {
     doc = xmlReadFile(xml_file.c_str(), NULL, 0);
     if (doc == nullptr) {
       std::cerr << "XMLExtract: Unable to parse file " << xml_file << std::endl;
@@ -117,7 +287,7 @@ public:
     root_node = nullptr;
   }
   // move constructor
-  XMLExtract(XMLExtract &&other) {
+  Extract(Extract &&other) {
     this->doc = other.doc;
     this->root = other.root;
     this->root_node = std::move(other.root_node);
@@ -127,7 +297,7 @@ public:
     other.root_node = nullptr;
   }
   // move assignment
-  XMLExtract &operator=(XMLExtract &&other) {
+  Extract &operator=(Extract &&other) {
     if (this != &other) {
       this->doc = other.doc;
       this->root = other.root;
@@ -141,13 +311,13 @@ public:
     return *this;
   }
 
-  XMLExtract(const XMLExtract &) = delete;
-  XMLExtract &operator=(const XMLExtract &) = delete;
+  Extract(const Extract &) = delete;
+  Extract &operator=(const Extract &) = delete;
 
   // Calling function assign
   // Called  function allocates
   void extract() {
-    root_node = traverse(root->children);
+    root_node = make_internal(root->children);
     std::cout << "Extracted!" << std::endl;
   }
 
@@ -156,17 +326,19 @@ public:
     walk_root_node(root_node.get());
   }
 
+  std::unique_ptr<NodeBase> get_root() { return std::move(root_node); }
+
 private:
   xmlDoc *doc;
   xmlNode *root;
-  std::unique_ptr<XML::NodeBase> root_node;
+  std::unique_ptr<NodeBase> root_node;
 
-  void walk_root_node(XML::NodeBase *root) {
+  void walk_root_node(NodeBase *root) {
     if (root == nullptr) {
       return;
     }
-    if (root->type == XML::NodeType::Internal) {
-      XML::Node *node = static_cast<XML::Node *>(root);
+    if (root->type == NodeType::Internal) {
+      Node *node = static_cast<Node *>(root);
       for (auto it = node->children.begin(); it != node->children.end(); ++it) {
         std::cout << "NODE: " << it->first << std::endl;
         for (auto &item : it->second) {
@@ -174,22 +346,32 @@ private:
         }
       }
     } else {
-      XML::Leaf *leaf = static_cast<XML::Leaf *>(root);
-      std::cout << "TEXT: " << leaf->text << std::endl;
+      Leaf *leaf = static_cast<Leaf *>(root);
+      if (leaf->content_idx == 0) {
+        std::cout << "TEXT: " << std::get<0>(leaf->content) << std::endl;
+      } else {
+        HTML::walk(std::get<1>(leaf->content).get());
+      }
     }
   }
 
-  std::unique_ptr<XML::NodeBase> make_leaf(xmlNode *cur_node) {
+  std::unique_ptr<NodeBase> make_leaf(xmlNode *cur_node) {
     if (cur_node == nullptr) {
       return nullptr;
     }
 
     xmlNode *node;
-    std::unique_ptr<XML::Leaf> node_obj = std::make_unique<XML::Leaf>();
+    std::unique_ptr<Leaf> leaf = std::make_unique<Leaf>();
     for (node = cur_node; node; node = node->next) {
-      if (node->type == XML_TEXT_NODE || node->type == XML_CDATA_SECTION_NODE) {
+      if (node->type == XML_TEXT_NODE) {
         if (node->content) {
-          node_obj->text = std::string((char *)node->content);
+          leaf->content = std::string((char *)node->content);
+          leaf->content_idx = 0;
+        }
+      } else if (node->type == XML_CDATA_SECTION_NODE) {
+        if (node->content) {
+          leaf->content = HTML::extract(node->content);
+          leaf->content_idx = 1;
         }
       } else {
         std::cout
@@ -198,31 +380,31 @@ private:
       }
     }
 
-    return std::move(node_obj);
+    return std::move(leaf);
   }
 
-  std::unique_ptr<XML::NodeBase> traverse(xmlNode *cur_node) {
+  std::unique_ptr<NodeBase> make_internal(xmlNode *cur_node) {
     if (cur_node == nullptr) {
       return nullptr;
     }
 
     xmlNode *node;
-    std::unique_ptr<XML::Node> node_obj = std::make_unique<XML::Node>();
+    std::unique_ptr<Node> node_obj = std::make_unique<Node>();
     for (node = cur_node; node; node = node->next) {
       if (node->type == XML_ELEMENT_NODE) {
         std::string name{(const char *)(node->name)};
-        std::unique_ptr<XML::NodeBase> internal_node;
-        if (name == "item" || name == "image" || name == "channel") {
-          internal_node = traverse(node->children);
-        } else {
-          internal_node = make_leaf(node->children);
-        }
+        std::unique_ptr<NodeBase> internal_node =
+            (name == "item" || name == "image" || name == "channel")
+                ? make_internal(node->children)
+                : make_leaf(node->children);
         node_obj->children[name].push_back(std::move(internal_node));
       }
     }
     return node_obj;
   }
 };
+
+} // namespace XML
 
 int main(int argc, char *argv[]) {
   using namespace ftxui;
@@ -285,7 +467,7 @@ int main(int argc, char *argv[]) {
     const std::string dir_name{DefeedCtx::rss + "/" + std::to_string(hash)};
     const std::string file_name{dir_name + "/rssfeed.txt"};
 
-    XMLExtract x{file_name};
+    XML::Extract x{file_name};
     x.extract();
     x.walk();
 

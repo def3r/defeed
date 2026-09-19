@@ -1,14 +1,20 @@
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <functional>
+#include <future>
 #include <iostream>
 #include <string>
 #include <vector>
 
 #include <curl/curl.h>
 #include <curl/multi.h>
+#include <ftxui/component/app.hpp>
+#include <ftxui/component/component.hpp>
+#include <ftxui/component/event.hpp>
+#include <ftxui/component/loop.hpp>
 #include <ftxui/dom/elements.hpp>
 #include <ftxui/screen/screen.hpp>
 #include <libxml/HTMLparser.h>
@@ -17,16 +23,13 @@
 #include <libxml/tree.h>
 
 #include "fetcher.h"
+#include "ftxui/dom/elements.hpp"
 #include "global.h"
 #include "xml.h"
 
-int main(int argc, char *argv[]) {
-  using namespace ftxui;
+using namespace std::chrono_literals;
 
-  CurlGlobal::init();
-  DefeedCtx::init();
-  DefeedCtx::setup_dirs();
-
+std::vector<std::unique_ptr<XML::NodeBase>> fetchRSS() {
   std::ifstream rss_txt{DefeedCtx::rss_txt};
   if (!rss_txt.is_open()) {
     std::cerr << "Cant open file " << DefeedCtx::rss_txt << std::endl;
@@ -77,34 +80,102 @@ int main(int argc, char *argv[]) {
   fetch_rss.perform_write();
   cond_fetch_rss.perform_write();
 
+  std::vector<std::unique_ptr<XML::NodeBase>> nodes;
+
   for (auto [url, hash] : rss_urls) {
     const std::string dir_name{DefeedCtx::rss + "/" + std::to_string(hash)};
     const std::string file_name{dir_name + "/rssfeed.txt"};
 
     XML::Extract x{file_name};
     x.extract();
-    x.walk();
 
-    break;
+    nodes.emplace_back(x.get_root());
   }
+
+  return nodes;
+}
+
+int main(int argc, char *argv[]) {
+  using namespace ftxui;
+
+  CurlGlobal::init();
+  DefeedCtx::init();
+  DefeedCtx::setup_dirs();
+
+  // Main Thread
 
   // Create a simple document with three text elements.
   Element document = hbox({
       text("left") | border,
-      text("middle") | border | flex,
+      text("middle") | border,
       text("right") | border,
   });
 
   // Create a screen with full width and height fitting the document.
-  auto screen = Screen::Create(Dimension::Full(),       // Width
-                               Dimension::Fit(document) // Height
-  );
+  // auto screen = Screen::Create(Dimension::Full(), // Width
+  //                              Dimension::Full()  // Height
+  // );
 
-  // Render the document onto the screen.
-  Render(screen, document);
+  bool refetching_rss = false;
+  std::future<std::vector<std::unique_ptr<XML::NodeBase>>> f;
 
-  // Print the screen to the console.
-  screen.Print();
+  size_t timeout = 0;
+  int count = 0;
+  auto screen = App::Fullscreen();
+  auto renderer = Renderer([&] {
+    static int ren_count;
+    if (count != ren_count) {
+      ren_count = count;
+    }
+    return vbox({
+        text("Home screen"),
+        text("Press r to reload rss"),
+        text("Press q to quit"),
+        separator(),
+        text("Pressed r " + std::to_string(count) + " times"),
+        text("Timeout Count  " + std::to_string(count) + " times"),
+    });
+  });
+
+  auto component = CatchEvent(renderer, [&](Event event) {
+    if (event == Event::Character('q')) {
+      screen.ExitLoopClosure()();
+    }
+    if (event == Event::Character('r')) {
+      if (!refetching_rss) {
+        f = std::async(std::launch::async, &fetchRSS);
+        refetching_rss = true;
+      }
+    }
+    return false;
+  });
+
+  // screen.Loop(component);
+
+  Loop l(&screen, component);
+  while (!l.HasQuitted()) {
+    if (refetching_rss) {
+      switch (std::future_status status = f.wait_for(100ms); status) {
+      case std::future_status::deferred:
+        std::cerr << "main_thread: Illegal defer; Must not defer rss fetch"
+                  << std::endl;
+        std::abort();
+
+      case std::future_status::ready:
+        refetching_rss = false;
+        count++;
+        break;
+
+      case std::future_status::timeout:
+        timeout++;
+        break;
+      };
+    }
+
+    l.RunOnceBlocking();
+  }
+
+  // Child Threads
 
   CurlGlobal::cleanup();
 }

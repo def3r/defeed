@@ -1,4 +1,3 @@
-#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
@@ -7,6 +6,7 @@
 #include <future>
 #include <iostream>
 #include <string>
+#include <thread>
 #include <vector>
 
 #include <curl/curl.h>
@@ -30,6 +30,8 @@
 using namespace std::chrono_literals;
 
 std::vector<std::unique_ptr<XML::NodeBase>> fetchRSS() {
+  std::this_thread::sleep_for(6s);
+  return {};
   std::ifstream rss_txt{DefeedCtx::rss_txt};
   if (!rss_txt.is_open()) {
     std::cerr << "Cant open file " << DefeedCtx::rss_txt << std::endl;
@@ -116,45 +118,62 @@ int main(int argc, char *argv[]) {
   //                              Dimension::Full()  // Height
   // );
 
-  bool refetching_rss = false;
+  bool fetching_rss = false;
   std::future<std::vector<std::unique_ptr<XML::NodeBase>>> f;
 
   size_t timeout = 0;
   int count = 0;
   auto screen = App::Fullscreen();
-  auto renderer = Renderer([&] {
+  Component loading = Renderer([&fetching_rss] {
+    static int img;
+    constexpr int idx = 15;
+    if (!fetching_rss) {
+      return emptyElement();
+    }
+    img = (img + 1) % 200;
+    return spinner(idx, img);
+  });
+
+  Component renderer = Renderer([&] {
     static int ren_count;
     if (count != ren_count) {
       ren_count = count;
     }
-    return vbox({
-        text("Home screen"),
-        text("Press r to reload rss"),
-        text("Press q to quit"),
-        separator(),
-        text("Pressed r " + std::to_string(count) + " times"),
-        text("Timeout Count  " + std::to_string(count) + " times"),
-    });
+    Element home =
+        vbox({text("Home screen"), text("Press r to reload rss"),
+              text("Press q to quit"), separator(),
+              text("Pressed r " + std::to_string(count) + " times"),
+              text("Timeout Count  " + std::to_string(timeout) + " times"),
+              loading->Render()});
+
+    return home;
   });
 
-  auto component = CatchEvent(renderer, [&](Event event) {
+  Component Home = Container::Vertical({});
+  Home->Add(renderer);
+  Home->Add(loading);
+  Home->Add(Renderer([] { return text("Bad Docs"); }));
+
+  Home |= CatchEvent([&](Event event) {
     if (event == Event::Character('q')) {
       screen.ExitLoopClosure()();
+      return true;
     }
     if (event == Event::Character('r')) {
-      if (!refetching_rss) {
+      if (!fetching_rss) {
         f = std::async(std::launch::async, &fetchRSS);
-        refetching_rss = true;
+        fetching_rss = true;
       }
+      return true;
     }
     return false;
   });
 
   // screen.Loop(component);
 
-  Loop l(&screen, component);
+  Loop l(&screen, Home);
   while (!l.HasQuitted()) {
-    if (refetching_rss) {
+    if (fetching_rss) {
       switch (std::future_status status = f.wait_for(100ms); status) {
       case std::future_status::deferred:
         std::cerr << "main_thread: Illegal defer; Must not defer rss fetch"
@@ -162,7 +181,7 @@ int main(int argc, char *argv[]) {
         std::abort();
 
       case std::future_status::ready:
-        refetching_rss = false;
+        fetching_rss = false;
         count++;
         break;
 
@@ -172,10 +191,13 @@ int main(int argc, char *argv[]) {
       };
     }
 
-    l.RunOnceBlocking();
-  }
+    screen.RequestAnimationFrame();
 
-  // Child Threads
+    l.RunOnce();
+
+    // 60fps
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000 / 60));
+  }
 
   CurlGlobal::cleanup();
 }

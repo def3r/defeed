@@ -124,7 +124,8 @@ size_t Fetcher::header_callback(char *buffer, size_t size, size_t nitems,
     }
     // feed 304 Not Modified; early exit
     if (res.substr(second + 1, 3) == "304") {
-      std::cout << "hash\t" << ud->hash << "\t304 Not Modified" << std::endl;
+      sb.append("hash\t" + std::to_string(ud->hash) + "\t304 Not Modified" +
+                "\n");
       ud->hash = 0;
       return n;
     }
@@ -141,8 +142,8 @@ size_t Fetcher::header_callback(char *buffer, size_t size, size_t nitems,
     // match because it may happen that CDN may have a cache miss and it ignores
     // the 'If-None-Match' thing in the header
     if (new_etag == ud->etag) {
-      std::cout << "Returned 200 but etag not modified for " << ud->hash
-                << std::endl;
+      sb.append("Returned 200 but etag not modified for " +
+                std::to_string(ud->hash) + "\n");
       ud->hash = 0;
       return n;
     }
@@ -153,9 +154,9 @@ size_t Fetcher::header_callback(char *buffer, size_t size, size_t nitems,
     }
     std::ofstream etag_file{url_path.string() + "/etag"};
     etag_file << new_etag;
-    std::cout << "ETag modified for hash: " << ud->hash
-              << "\t new ETag: " << new_etag << std::endl;
-    std::cout << "Fetching rss feed for " << ud->hash << std::endl;
+    sb.append("ETag modified for hash: " + std::to_string(ud->hash) +
+              "\t new ETag: " + new_etag + "\n");
+    sb.append("Fetching rss feed for " + std::to_string(ud->hash) + "\n");
     etag_file.close();
   } else if ((pos = res.find("last")) != std::string::npos) {
     // TODO: fallback to Last-Modified: field

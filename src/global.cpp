@@ -1,9 +1,12 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <mutex>
+#include <vector>
 
 #include <curl/curl.h>
 
+#include "fetcher.h"
 #include "global.h"
 
 CurlGlobal::CurlGlobal() {}
@@ -59,4 +62,86 @@ void DefeedCtx::setup_dirs() {
     std::ofstream rss_file{DefeedCtx::rss_txt};
     rss_file.close();
   }
+}
+
+// TODO: This is increasing couplic for global.cpp, maybe move somewhere else
+std::vector<std::unique_ptr<XML::NodeBase>> DefeedCtx::fetchRSS() {
+  std::ifstream rss_txt{DefeedCtx::rss_txt};
+  if (!rss_txt.is_open()) {
+    std::cerr << "Cant open file " << DefeedCtx::rss_txt << std::endl;
+    std::exit(1);
+  }
+
+  std::vector<std::pair<std::string, size_t>> rss_urls{};
+  while (!rss_txt.eof()) {
+    std::string url{};
+    std::getline(rss_txt, url);
+    if (!url.empty()) {
+      size_t hash = std::hash<std::string>{}(url);
+      sb.append(std::to_string(hash) + "\t\t" + url + "\n");
+      rss_urls.push_back({url, hash});
+    }
+  }
+  rss_txt.close();
+
+  MultiFetcher fetch_rss{};
+  MultiFetcher cond_fetch_rss{};
+  for (auto [url, hash] : rss_urls) {
+    std::filesystem::path url_path{DefeedCtx::rss + "/" + std::to_string(hash)};
+    if (!std::filesystem::is_directory(url_path)) {
+      fetch_rss.add(url);
+      continue;
+    }
+    std::ifstream etag_file{url_path.string() + "/etag"};
+    if (!etag_file.is_open()) {
+      sb.append("Can't find etag file for " + std::to_string(hash) + " (" +
+                url + ")" + "\n");
+      sb.append("\tFetching feed for " + std::to_string(hash) + " (" + url +
+                ")" + "\n");
+      fetch_rss.add(url);
+      continue;
+    }
+    std::string etag{};
+    etag_file >> etag;
+    etag_file.close();
+
+    sb.append("If-None-Match: " + etag + "\n");
+
+    Fetcher f{url, etag};
+    f.append_headers("If-None-Match: " + etag);
+    f.apply_headers();
+    cond_fetch_rss.add(std::move(f));
+  }
+
+  fetch_rss.perform_write();
+  cond_fetch_rss.perform_write();
+  sb.append("Completed fetches!\n");
+
+  std::vector<std::unique_ptr<XML::NodeBase>> nodes;
+
+  for (auto [url, hash] : rss_urls) {
+    const std::string dir_name{DefeedCtx::rss + "/" + std::to_string(hash)};
+    const std::string file_name{dir_name + "/rssfeed.txt"};
+
+    XML::Extract x{file_name};
+    x.extract();
+
+    nodes.emplace_back(x.get_root());
+  }
+
+  return nodes;
+}
+
+SharedBuffer::SharedBuffer() { buf.reserve(4096); };
+
+std::string SharedBuffer::getString() {
+  std::unique_lock lock(mtx);
+  return std::string(buf.begin(), buf.end());
+}
+
+void SharedBuffer::append(const std::string &s) {
+  std::unique_lock lock(mtx);
+  buf.insert(buf.end(), s.begin(), s.end());
+  // std::cout << "buf: " << buf.size() << "\t"
+  //           << std::string(buf.begin(), buf.end());
 }

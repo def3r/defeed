@@ -3,6 +3,7 @@
 #include <string>
 #include <unordered_map>
 
+#include "global.h"
 #include "html.h"
 #include "xml.h"
 
@@ -72,11 +73,11 @@ Extract &Extract::operator=(Extract &&other) {
 // Called  function allocates
 void Extract::extract() {
   root_node = make_internal(root->children);
-  std::cout << "Extracted!" << std::endl;
+  sb.append("Extracted!\n");
 }
 
 void Extract::walk() {
-  std::cout << "NODE: ROOT" << std::endl;
+  sb.append("NODE: ROOT\n");
   walk_root_node(root_node.get());
 }
 
@@ -89,7 +90,7 @@ void Extract::walk_root_node(NodeBase *root) {
   if (root->type == NodeType::Internal) {
     Node *node = static_cast<Node *>(root);
     for (auto it = node->children.begin(); it != node->children.end(); ++it) {
-      std::cout << "NODE: " << it->first << std::endl;
+      sb.append("NODE: " + it->first + "\n");
       for (auto &item : it->second) {
         walk_root_node(item.get());
       }
@@ -97,7 +98,7 @@ void Extract::walk_root_node(NodeBase *root) {
   } else {
     Leaf *leaf = static_cast<Leaf *>(root);
     if (leaf->content_idx == 0) {
-      std::cout << "TEXT: " << std::get<0>(leaf->content) << std::endl;
+      sb.append("TEXT: " + std::get<0>(leaf->content) + "\n");
     } else {
       HTML::walk(std::get<1>(leaf->content).get());
     }
@@ -123,8 +124,8 @@ std::unique_ptr<NodeBase> Extract::make_leaf(xmlNode *cur_node) {
         leaf->content_idx = 1;
       }
     } else {
-      std::cout << "XML Leaf node not a text node or cdata section; instead a "
-                << node->type << std::endl;
+      sb.append("XML Leaf node not a text node or cdata section; instead a " +
+                std::to_string(node->type) + "\n");
     }
   }
 

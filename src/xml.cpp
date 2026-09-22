@@ -73,11 +73,11 @@ Extract &Extract::operator=(Extract &&other) {
 // Called  function allocates
 void Extract::extract() {
   root_node = make_internal(root->children);
-  sb.append("Extracted!\n");
+  sb.append("Extracted!");
 }
 
 void Extract::walk() {
-  sb.append("NODE: ROOT\n");
+  sb.append("NODE: ROOT");
   walk_root_node(root_node.get());
 }
 
@@ -90,7 +90,7 @@ void Extract::walk_root_node(NodeBase *root) {
   if (root->type == NodeType::Internal) {
     Node *node = static_cast<Node *>(root);
     for (auto it = node->children.begin(); it != node->children.end(); ++it) {
-      sb.append("NODE: " + it->first + "\n");
+      sb.append("NODE: " + it->first);
       for (auto &item : it->second) {
         walk_root_node(item.get());
       }
@@ -98,7 +98,7 @@ void Extract::walk_root_node(NodeBase *root) {
   } else {
     Leaf *leaf = static_cast<Leaf *>(root);
     if (leaf->content_idx == 0) {
-      sb.append("TEXT: " + std::get<0>(leaf->content) + "\n");
+      sb.append("TEXT: " + std::get<0>(leaf->content));
     } else {
       HTML::walk(std::get<1>(leaf->content).get());
     }
@@ -125,7 +125,7 @@ std::unique_ptr<NodeBase> Extract::make_leaf(xmlNode *cur_node) {
       }
     } else {
       sb.append("XML Leaf node not a text node or cdata section; instead a " +
-                std::to_string(node->type) + "\n");
+                std::to_string(node->type));
     }
   }
 

@@ -52,7 +52,7 @@ static std::unique_ptr<HTML::NodeBase> make_internal(xmlNode *cur_node) {
     return make_leaf(cur_node);
   }
   if (cur_node->type != XML_ELEMENT_NODE) {
-    sb.append("make_internal: node not an XML_ELEMENT_NODE\n");
+    sb.append("make_internal: node not an XML_ELEMENT_NODE");
     return nullptr;
   }
 
@@ -81,7 +81,7 @@ static std::unique_ptr<HTML::NodeBase> make_internal(xmlNode *cur_node) {
   }
   if (cur_node->content) {
     sb.append("make_internal: Internal node with content: " +
-              std::string((char *)cur_node->content) + "\n");
+              std::string((char *)cur_node->content));
   }
 
   xmlNode *node = nullptr;
@@ -105,7 +105,7 @@ static std::unique_ptr<HTML::NodeBase> make_internal(xmlNode *cur_node) {
 
 std::unique_ptr<HTML::NodeBase> extract(const xmlChar *str) {
   if (str == nullptr) {
-    sb.append("HTML::extract : passed nullptr for in memory str\n");
+    sb.append("HTML::extract : passed nullptr for in memory str");
     return {};
   }
 
@@ -130,15 +130,15 @@ void walk(HTML::NodeBase *root) {
   if (root == nullptr) {
     return;
   }
-  sb.append("\t\tHTML::" + root->attrs["HTMLNodeName"] + "\n");
+  sb.append("\t\tHTML::" + root->attrs["HTMLNodeName"]);
   for (auto it = root->attrs.begin(); it != root->attrs.end(); ++it) {
     if (it->first != "HTMLNodeName")
-      sb.append("\t\t\t" + it->first + " = " + it->second + "\n");
+      sb.append("\t\t\t" + it->first + " = " + it->second);
   }
 
   if (root->type == HTML::NodeType::Leaf) {
     HTML::Leaf *leaf = static_cast<HTML::Leaf *>(root);
-    sb.append("\t\tContents: " + leaf->content + "\n");
+    sb.append("\t\tContents: " + leaf->content);
   } else {
     HTML::Node *node = static_cast<HTML::Node *>(root);
     for (int i = 0; i < node->children.size(); i++) {

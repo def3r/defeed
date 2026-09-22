@@ -78,7 +78,7 @@ std::vector<std::unique_ptr<XML::NodeBase>> DefeedCtx::fetchRSS() {
     std::getline(rss_txt, url);
     if (!url.empty()) {
       size_t hash = std::hash<std::string>{}(url);
-      sb.append(std::to_string(hash) + "\t\t" + url + "\n");
+      sb.append(std::to_string(hash) + "\t\t" + url);
       rss_urls.push_back({url, hash});
     }
   }
@@ -95,9 +95,9 @@ std::vector<std::unique_ptr<XML::NodeBase>> DefeedCtx::fetchRSS() {
     std::ifstream etag_file{url_path.string() + "/etag"};
     if (!etag_file.is_open()) {
       sb.append("Can't find etag file for " + std::to_string(hash) + " (" +
-                url + ")" + "\n");
+                url + ")");
       sb.append("\tFetching feed for " + std::to_string(hash) + " (" + url +
-                ")" + "\n");
+                ")");
       fetch_rss.add(url);
       continue;
     }
@@ -105,7 +105,7 @@ std::vector<std::unique_ptr<XML::NodeBase>> DefeedCtx::fetchRSS() {
     etag_file >> etag;
     etag_file.close();
 
-    sb.append("If-None-Match: " + etag + "\n");
+    sb.append("If-None-Match: " + etag);
 
     Fetcher f{url, etag};
     f.append_headers("If-None-Match: " + etag);
@@ -115,7 +115,7 @@ std::vector<std::unique_ptr<XML::NodeBase>> DefeedCtx::fetchRSS() {
 
   fetch_rss.perform_write();
   cond_fetch_rss.perform_write();
-  sb.append("Completed fetches!\n");
+  sb.append("Completed fetches!");
 
   std::vector<std::unique_ptr<XML::NodeBase>> nodes;
 
@@ -132,7 +132,10 @@ std::vector<std::unique_ptr<XML::NodeBase>> DefeedCtx::fetchRSS() {
   return nodes;
 }
 
-SharedBuffer::SharedBuffer() { buf.reserve(4096); };
+SharedBuffer::SharedBuffer() {
+  buf.reserve(4096);
+  entries.reserve(4096);
+};
 
 std::string SharedBuffer::getString() {
   std::unique_lock lock(mtx);
@@ -141,7 +144,22 @@ std::string SharedBuffer::getString() {
 
 void SharedBuffer::append(const std::string &s) {
   std::unique_lock lock(mtx);
+  char *data = buf.data() + buf.size();
   buf.insert(buf.end(), s.begin(), s.end());
-  // std::cout << "buf: " << buf.size() << "\t"
-  //           << std::string(buf.begin(), buf.end());
+  entries.emplace_back(std::string_view(data, s.size()));
+  // TODO: buf sizecheck and invalidation on realloc
 }
+
+const std::vector<std::string_view> &SharedBuffer::getEntries() {
+  std::unique_lock lock(mtx);
+  return this->entries;
+}
+
+const std::size_t SharedBuffer::getTotalEntries() {
+  std::unique_lock lock(mtx);
+  return this->entries.size();
+}
+
+void SharedBuffer::lock() { mtx.lock(); }
+
+void SharedBuffer::unlock() { mtx.unlock(); }

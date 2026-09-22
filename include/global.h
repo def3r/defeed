@@ -27,11 +27,17 @@ class SharedBuffer {
 public:
   SharedBuffer();
   std::string getString();
+  const std::vector<std::string_view> &getEntries();
+  const std::size_t getTotalEntries();
   void append(const std::string &s);
 
 private:
   std::mutex mtx;
   std::vector<char> buf;
+  std::vector<std::string_view> entries;
+
+  void lock();
+  void unlock();
 };
 
 extern SharedBuffer sb;

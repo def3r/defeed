@@ -36,6 +36,7 @@ int main(int argc, char *argv[]) {
 
   // Main Thread
 
+  bool show_logs = false;
   bool fetching_rss = false;
   std::future<std::vector<std::unique_ptr<XML::NodeBase>>> f;
 
@@ -52,9 +53,40 @@ int main(int argc, char *argv[]) {
     return spinner(idx, img);
   });
 
-  Component log = Renderer([&] {
-    const std::string s = sb.getString();
-    return s.size() ? paragraph(s) : emptyElement();
+  int log_menu_idx = 0;
+  Component log_menu = Menu(&sb.getEntries(), &log_menu_idx);
+  Component log = Renderer(log_menu, [&] {
+    static std::size_t last_entry_idx = log_menu_idx;
+
+    if (!show_logs) {
+      return emptyElement();
+    }
+
+    std::size_t cur_entry_count = sb.getTotalEntries();
+    if (last_entry_idx != cur_entry_count - 1) {
+      if (log_menu_idx == last_entry_idx) {
+        log_menu_idx = cur_entry_count - 1;
+      }
+    }
+    last_entry_idx = cur_entry_count - 1;
+
+    return log_menu->Render() | vscroll_indicator | yframe |
+           size(ftxui::HEIGHT, ftxui::EQUAL, 10);
+  });
+
+  Component status_line = Renderer([&] {
+    std::string status = (fetching_rss ? "Fetching" : "Normal");
+
+    // clang-format off
+    return hbox({
+      text(" "),
+      text(status),
+      text(" "),
+      loading->Render(),
+      filler() | yflex,
+    }) | bgcolor(Color::Blue)
+       | color(Color::White);
+    // clang-format off
   });
 
   Component renderer = Renderer([&] {
@@ -62,30 +94,46 @@ int main(int argc, char *argv[]) {
     if (count != ren_count) {
       ren_count = count;
     }
-    Element home =
-        vbox({text("Home screen"), text("Press r to reload rss"),
-              text("Press q to quit"), separator(),
-              text("Pressed r " + std::to_string(count) + " times"),
-              text("Timeout Count  " + std::to_string(timeout) + " times"),
-              loading->Render(), log->Render()});
+
+    // clang-format off
+    Element home = vbox({
+      text("Home screen"),
+      text("Press r to reload rss"),
+      text("Press q to quit"),
+      text("Press l to toggle logs"),
+      separator(),
+      text("Pressed r " + std::to_string(count) + " times"),
+      text("Timeout Count  " + std::to_string(timeout) + " times"),
+
+      filler(),
+
+      status_line->Render()
+    }) | flex;
+    // clang-format on
 
     return home;
   });
 
   Component Home = Container::Vertical({});
   Home->Add(renderer);
-  Home->Add(Renderer([] { return text("Bad Docs"); }));
+  Home->Add(log);
 
   Home |= CatchEvent([&](Event event) {
     if (event == Event::Character('q')) {
       screen.ExitLoopClosure()();
       return true;
     }
+
     if (event == Event::Character('r')) {
       if (!fetching_rss) {
         f = std::async(std::launch::async, &DefeedCtx::fetchRSS);
         fetching_rss = true;
       }
+      return true;
+    }
+
+    if (event == Event::Character('l')) {
+      show_logs = !show_logs;
       return true;
     }
     return false;

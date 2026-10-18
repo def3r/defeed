@@ -78,6 +78,7 @@ public:
   void walk();
 
 private:
+  std::string xml_file;
   xmlDoc *doc;
   xmlNode *root;
   std::unique_ptr<NodeBase> root_node;

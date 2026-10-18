@@ -4,4 +4,5 @@ https://www.stephendiehl.com/feed.xml
 https://www.seantallen.com/index.xml
 https://mo.io/rss.xml
 https://maskray.me/blog/atom.xml
+https://mcyoung.xyz/feed.xml
 

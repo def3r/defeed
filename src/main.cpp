@@ -27,6 +27,8 @@ using namespace std::chrono_literals;
 
 SharedBuffer sb{};
 
+enum class Mode { Normal, Cmd };
+
 int main(int argc, char *argv[]) {
   using namespace ftxui;
 
@@ -39,6 +41,7 @@ int main(int argc, char *argv[]) {
   bool show_logs = false;
   bool fetching_rss = false;
   std::future<std::vector<std::unique_ptr<XML::NodeBase>>> f;
+  Mode mode = Mode::Normal;
 
   size_t timeout = 0;
   int count = 0;
@@ -75,7 +78,11 @@ int main(int argc, char *argv[]) {
   });
 
   Component status_line = Renderer([&] {
-    std::string status = (fetching_rss ? "Fetching" : "Normal");
+    std::string status;
+    if (mode == Mode::Normal)
+      status = (fetching_rss ? "Fetching" : "Normal");
+    else
+      status = "Cmd";
 
     // clang-format off
     return hbox({
@@ -86,7 +93,22 @@ int main(int argc, char *argv[]) {
       filler() | yflex,
     }) | bgcolor(Color::Blue)
        | color(Color::White);
-    // clang-format off
+    // clang-format on
+  });
+
+  std::string cmd;
+  Component cmd_line = Renderer([&] {
+    if (mode != Mode::Cmd) {
+      return emptyElement();
+    }
+    return Input(&cmd)->Render();
+  });
+
+  cmd_line |= CatchEvent([&](Event event) {
+    if (event == Event::Escape) {
+      mode = Mode::Normal;
+    }
+    return false;
   });
 
   Component renderer = Renderer([&] {
@@ -117,8 +139,12 @@ int main(int argc, char *argv[]) {
   Component Home = Container::Vertical({});
   Home->Add(renderer);
   Home->Add(log);
+  Home->Add(cmd_line);
 
   Home |= CatchEvent([&](Event event) {
+    if (mode != Mode::Normal)
+      return false;
+
     if (event == Event::Character('q')) {
       screen.ExitLoopClosure()();
       return true;
@@ -136,6 +162,12 @@ int main(int argc, char *argv[]) {
       show_logs = !show_logs;
       return true;
     }
+
+    if (event == Event::Character(':')) {
+      mode = Mode::Cmd;
+      return true;
+    }
+
     return false;
   });
 
@@ -169,3 +201,5 @@ int main(int argc, char *argv[]) {
 
   CurlGlobal::cleanup();
 }
+
+// BUG: mcyoung and stephendeihl fetched xml is corrupted?

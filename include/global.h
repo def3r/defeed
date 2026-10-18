@@ -4,6 +4,7 @@
 #include <mutex>
 #include <string>
 #include <vector>
+#include <fstream>
 
 #include "xml.h"
 
@@ -35,6 +36,7 @@ private:
   std::mutex mtx;
   std::vector<char> buf;
   std::vector<std::string_view> entries;
+  std::fstream lfile;
 
   void lock();
   void unlock();

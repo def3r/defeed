@@ -27,6 +27,7 @@ Extract::~Extract() {
 }
 
 Extract::Extract(const std::string &xml_file) {
+  this->xml_file = xml_file;
   doc = xmlReadFile(xml_file.c_str(), NULL, 0);
   if (doc == nullptr) {
     std::cerr << "XMLExtract: Unable to parse file " << xml_file << std::endl;
@@ -124,8 +125,10 @@ std::unique_ptr<NodeBase> Extract::make_leaf(xmlNode *cur_node) {
         leaf->content_idx = 1;
       }
     } else {
-      sb.append("XML Leaf node not a text node or cdata section; instead a " +
-                std::to_string(node->type));
+      sb.append(
+          "XML Leaf node not a text node or cdata section; instead of type " +
+          std::to_string(node->type));
+      sb.append(xml_file + ": " + std::string((char *)node->name));
     }
   }
 

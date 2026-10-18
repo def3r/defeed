@@ -135,6 +135,7 @@ std::vector<std::unique_ptr<XML::NodeBase>> DefeedCtx::fetchRSS() {
 SharedBuffer::SharedBuffer() {
   buf.reserve(4096);
   entries.reserve(4096);
+  lfile.open("log.txt", std::ios::out);
 };
 
 std::string SharedBuffer::getString() {
@@ -147,6 +148,7 @@ void SharedBuffer::append(const std::string &s) {
   char *data = buf.data() + buf.size();
   buf.insert(buf.end(), s.begin(), s.end());
   entries.emplace_back(std::string_view(data, s.size()));
+  lfile << s << std::endl;
   // TODO: buf sizecheck and invalidation on realloc
 }
 

@@ -1,3 +1,4 @@
+#include "ftxui/component/component_base.hpp"
 #include "global.h"
 
 #include <future>
@@ -5,6 +6,7 @@
 #include <ftxui/component/app.hpp>
 #include <ftxui/component/component.hpp>
 #include <memory>
+#include <string>
 
 using namespace std::chrono_literals;
 
@@ -13,8 +15,6 @@ extern SharedBuffer sb;
 namespace UI {
 
 using namespace ftxui;
-
-enum class Mode { Normal, Cmd };
 
 class App;
 
@@ -26,49 +26,67 @@ public:
   bool Exec(std::string &cmd);
 };
 
+struct LoadingComponent : public ComponentBase {
+  Element OnRender() override;
+};
+struct LogMenuComponent : public ComponentBase {
+  LogMenuComponent();
+  Element OnRender() override;
+  bool Focusable() const override;
+
+private:
+  int log_menu_idx = 0;
+  Component log_menu;
+};
+
+struct StatusLineComponent : public ComponentBase {
+  StatusLineComponent();
+  Element OnRender() override;
+
+private:
+  Component loading;
+};
+
+struct CmdLineComponent : public ComponentBase {
+  CmdLineComponent(CmdLine *clunit);
+  Element OnRender() override;
+  bool Focusable() const override;
+
+private:
+  std::string cmd;
+  Component input;
+  CmdLine *clunit;
+};
+
+struct Page : public ComponentBase {
+  bool Focusable() const override;
+  static MenuOption menuStyle();
+};
+
+struct LandingPage : public Page {
+  LandingPage(const std::vector<std::string> &entries);
+  Element OnRender() override;
+
+private:
+  int selected = 0;
+  std::vector<std::string> entries;
+  Component renderer, home_menu;
+};
+
 class App {
   friend class CmdLine;
 
   std::future<std::vector<std::unique_ptr<RssFeed>>> f;
   std::vector<std::unique_ptr<RssFeed>> feeds;
 
-  bool show_logs = false;
-  bool fetching_rss = false;
-  Mode mode = Mode::Normal;
-  bool quit = false;
   ftxui::App screen;
   CmdLine cmd_exec_unit;
+  Component log, status_line, cmd_line, page, app;
 
-  size_t timeout = 0;
-  int count = 0;
-
-  Component loading;
-  void init_comp_loading();
-
-  int log_menu_idx = 0;
-  Component log_menu, log;
-  void init_comp_log();
-
-  Component status_line;
-  void init_comp_status_line();
-
-  std::string cmd;
-  Component input, cmd_line, prev_focus;
-  void init_comp_cmdline();
-
-  int selected = 0;
-  std::vector<std::string> entries;
-  Component renderer, home_menu;
-  Component listPage;
-  Component *ptrComponent = nullptr;
-  void init_comp_renderer();
-
-  Component Home;
-  void init_comp_home();
-
+  void init_app();
   void initialize_components();
-
   void begin_fetch();
+  std::vector<std::string> make_entries_from_feed();
 
 public:
   App();

@@ -1,8 +1,10 @@
 add_rules("mode.debug", "mode.release")
 add_rules("plugin.compile_commands.autoupdate", { outputdir = "." })
 
-add_requires("ftxui", { system = false })
+add_requires("ftxui", { debug = true, system = false })
 add_requires("libxml2", { system = true })
+
+set_toolchains("clang")
 
 target("defeed")
 set_kind("binary")
@@ -11,7 +13,6 @@ add_packages("ftxui")
 add_syslinks("curl", "pthread", "ssl", "unwind", "crypto", "xml2")
 add_includedirs("include")
 add_includedirs("/usr/include/libxml2/")
-
 --
 -- If you want to known more usage about xmake, please see https://xmake.io
 --

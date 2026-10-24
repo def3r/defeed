@@ -4,6 +4,7 @@
 
 #include <ftxui/component/app.hpp>
 #include <ftxui/component/component.hpp>
+#include <memory>
 
 using namespace std::chrono_literals;
 
@@ -28,7 +29,8 @@ public:
 class App {
   friend class CmdLine;
 
-  std::future<std::vector<std::unique_ptr<XML::NodeBase>>> f;
+  std::future<std::vector<std::unique_ptr<RssFeed>>> f;
+  std::vector<std::unique_ptr<RssFeed>> feeds;
 
   bool show_logs = false;
   bool fetching_rss = false;
@@ -51,16 +53,22 @@ class App {
   void init_comp_status_line();
 
   std::string cmd;
-  Component input, cmd_line;
+  Component input, cmd_line, prev_focus;
   void init_comp_cmdline();
 
-  Component renderer;
+  int selected = 0;
+  std::vector<std::string> entries;
+  Component renderer, home_menu;
+  Component listPage;
+  Component *ptrComponent = nullptr;
   void init_comp_renderer();
 
   Component Home;
   void init_comp_home();
 
   void initialize_components();
+
+  void begin_fetch();
 
 public:
   App();

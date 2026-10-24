@@ -1,6 +1,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <memory>
 #include <mutex>
 #include <vector>
 
@@ -64,15 +65,20 @@ void DefeedCtx::setup_dirs() {
   }
 }
 
-// TODO: This is increasing couplic for global.cpp, maybe move somewhere else
-std::vector<std::unique_ptr<XML::NodeBase>> DefeedCtx::fetchRSS() {
+// TODO: this only reads from the rss.txt one time per launch, maybe have a cmd
+// to force read it
+DefeedCtx::UrlPairs DefeedCtx::get_urls() {
+  static DefeedCtx::UrlPairs rss_urls{};
+  if (rss_urls.size() != 0) {
+    return rss_urls;
+  }
+
   std::ifstream rss_txt{DefeedCtx::rss_txt};
   if (!rss_txt.is_open()) {
     std::cerr << "Cant open file " << DefeedCtx::rss_txt << std::endl;
     std::exit(1);
   }
 
-  std::vector<std::pair<std::string, size_t>> rss_urls{};
   while (!rss_txt.eof()) {
     std::string url{};
     std::getline(rss_txt, url);
@@ -82,7 +88,12 @@ std::vector<std::unique_ptr<XML::NodeBase>> DefeedCtx::fetchRSS() {
       rss_urls.push_back({url, hash});
     }
   }
-  rss_txt.close();
+  return rss_urls;
+}
+
+// TODO: This is increasing couplic for global.cpp, maybe move somewhere else
+std::vector<std::unique_ptr<RssFeed>> DefeedCtx::fetchRSS() {
+  DefeedCtx::UrlPairs rss_urls = DefeedCtx::get_urls();
 
   MultiFetcher fetch_rss{};
   MultiFetcher cond_fetch_rss{};
@@ -117,7 +128,15 @@ std::vector<std::unique_ptr<XML::NodeBase>> DefeedCtx::fetchRSS() {
   cond_fetch_rss.perform_write();
   sb.append("Completed fetches!");
 
-  std::vector<std::unique_ptr<XML::NodeBase>> nodes;
+  std::vector<std::unique_ptr<RssFeed>> nodes = DefeedCtx::loadRSS();
+
+  return std::move(nodes);
+}
+
+// TODO: This is sequential for now but consider using async in future
+std::vector<std::unique_ptr<RssFeed>> DefeedCtx::loadRSS() {
+  std::vector<std::unique_ptr<RssFeed>> feeds;
+  DefeedCtx::UrlPairs rss_urls = DefeedCtx::get_urls();
 
   for (auto [url, hash] : rss_urls) {
     const std::string dir_name{DefeedCtx::rss + "/" + std::to_string(hash)};
@@ -126,10 +145,14 @@ std::vector<std::unique_ptr<XML::NodeBase>> DefeedCtx::fetchRSS() {
     XML::Extract x{file_name};
     x.extract();
 
-    nodes.emplace_back(x.get_root());
+    std::unique_ptr<RssFeed> feed = std::make_unique<RssFeed>();
+    feed->url = url;
+    feed->hash = hash;
+    feed->root = x.get_root();
+    feeds.emplace_back(std::move(feed));
   }
 
-  return nodes;
+  return std::move(feeds);
 }
 
 SharedBuffer::SharedBuffer() {

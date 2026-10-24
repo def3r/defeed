@@ -1,10 +1,10 @@
 #pragma once
 
+#include <fstream>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <vector>
-#include <fstream>
 
 #include "xml.h"
 
@@ -16,12 +16,30 @@ private:
   CurlGlobal();
 };
 
+struct RssFeed {
+  std::string url;
+  std::size_t hash;
+
+  std::string author;
+  std::string last_updated;
+
+  std::unique_ptr<XML::NodeBase> root;
+};
+
 struct DefeedCtx {
+  // clang-format off
+  using UrlPair  = std::pair<std::string, size_t>;
+  using UrlPairs = std::vector<UrlPair>;
+  // clang-format on
+
   static inline std::string home{}, defeed{};
   static inline std::string rss{}, rss_txt{}, rss_info{};
   static void init();
   static void setup_dirs();
-  static std::vector<std::unique_ptr<XML::NodeBase>> fetchRSS();
+  static UrlPairs get_urls();
+
+  static std::vector<std::unique_ptr<RssFeed>> fetchRSS();
+  static std::vector<std::unique_ptr<RssFeed>> loadRSS();
 };
 
 class SharedBuffer {

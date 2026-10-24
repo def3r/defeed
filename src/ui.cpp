@@ -15,8 +15,6 @@
 
 using namespace std::chrono_literals;
 
-extern SharedBuffer sb;
-
 namespace UI {
 
 using namespace ftxui;
@@ -53,6 +51,8 @@ void App::init_comp_log() {
     return log_menu->Render() | vscroll_indicator | yframe |
            size(ftxui::HEIGHT, ftxui::EQUAL, 10);
   });
+
+  log |= Maybe(&show_logs);
 }
 
 void App::init_comp_status_line() {
@@ -84,6 +84,9 @@ void App::init_comp_cmdline() {
   };
   input = Input(&cmd, cmd_line_style);
   input |= CatchEvent([this](Event event) {
+    if (mode != Mode::Cmd)
+      return false;
+
     if (event == Event::Escape) {
       mode = Mode::Normal;
       return true;
@@ -105,10 +108,42 @@ void App::init_comp_cmdline() {
     }
     return input->Render();
   });
+  cmd_line |= Maybe([this] { return mode == Mode::Cmd; });
 }
 
 void App::init_comp_renderer() {
-  renderer = Renderer([this] {
+  auto option = MenuOption::Vertical();
+  option.entries_option.transform = [](EntryState state) {
+    Element e = state.active ? text("[ " + state.label + " ]")
+                             : text("  " + state.label + "  ");
+    if (state.focused) {
+      e = e | bold;
+    }
+
+    if (state.focused) {
+      e = e | color(Color::Blue);
+    }
+    if (state.active) {
+      e = e | bold;
+    }
+    return e;
+  };
+  entries.reserve(feeds.size());
+  for (int i = 0; i < feeds.size(); i++) {
+    const RssFeed *ptr = feeds[i].get();
+    entries.push_back(ptr->url);
+  }
+
+  home_menu = Menu(entries, &selected, option);
+  home_menu |= CatchEvent([this](Event ev) {
+    if (ev == Event::Return) {
+      ptrComponent = &listPage;
+    }
+    return false;
+  });
+
+  ptrComponent = &home_menu;
+  renderer = Renderer(home_menu, [this] {
     static int ren_count;
     if (count != ren_count) {
       ren_count = count;
@@ -117,12 +152,8 @@ void App::init_comp_renderer() {
     // clang-format off
     Element home = vbox({
       text("Home screen"),
-      text("Press r to reload rss"),
-      text("Press q to quit"),
-      text("Press l to toggle logs"),
       separator(),
-      text("Pressed r " + std::to_string(count) + " times"),
-      text("Timeout Count  " + std::to_string(timeout) + " times"),
+      (*ptrComponent)->Render(),
 
       filler(),
 
@@ -145,31 +176,33 @@ void App::init_comp_home() {
       return false;
 
     if (event == Event::Character('q')) {
-      screen.ExitLoopClosure()();
+      if (show_logs)
+        show_logs = false;
+      else
+        screen.ExitLoopClosure()();
       return true;
     }
 
     if (event == Event::Character('r')) {
-      if (!fetching_rss) {
-        f = std::async(std::launch::async, &DefeedCtx::fetchRSS);
-        fetching_rss = true;
-      }
+      begin_fetch();
       return true;
     }
 
     if (event == Event::Character('l')) {
       show_logs = !show_logs;
+      log_menu->TakeFocus();
       return true;
     }
 
     if (event == Event::Character(':')) {
       mode = Mode::Cmd;
+      prev_focus = Home->ActiveChild();
       input->TakeFocus(); // Forcefully give it to the input else we need to
                           // press down arrow key or `j`
       return true;
     }
 
-    return event.is_character();
+    return false;
   });
 }
 
@@ -182,7 +215,15 @@ void App::initialize_components() {
   init_comp_home();
 }
 
+void App::begin_fetch() {
+  if (!fetching_rss) {
+    f = std::async(std::launch::async, &DefeedCtx::fetchRSS);
+    fetching_rss = true;
+  }
+}
+
 App::App() : screen(ftxui::App::Fullscreen()), cmd_exec_unit(this) {
+  feeds = DefeedCtx::loadRSS();
   initialize_components();
 }
 
@@ -225,8 +266,11 @@ bool CmdLine::Exec(std::string &cmd) {
 
   if (cmd == "log") {
     parent->show_logs = !parent->show_logs;
+    parent->log_menu->TakeFocus();
   } else if (cmd == "q") {
     parent->quit = true;
+  } else if (cmd == "fetch") {
+    parent->begin_fetch();
   } else {
     retval = false;
   }

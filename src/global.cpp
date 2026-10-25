@@ -35,6 +35,20 @@ void CurlGlobal::cleanup() {
   ccleanup = true;
 }
 
+void DefeedCtx::PageUp() {
+  if (DefeedCtx::page == DefeedCtx::Page::Landing)
+    return;
+  int pg = static_cast<int>(DefeedCtx::page);
+  DefeedCtx::page = static_cast<DefeedCtx::Page>(pg - 1);
+}
+
+void DefeedCtx::PageDown() {
+  if (DefeedCtx::page == DefeedCtx::Page::Blog)
+    return;
+  int pg = static_cast<int>(DefeedCtx::page);
+  DefeedCtx::page = static_cast<DefeedCtx::Page>(pg + 1);
+}
+
 void DefeedCtx::init() {
   const char *env_home = std::getenv("HOME");
   if (env_home == nullptr) {

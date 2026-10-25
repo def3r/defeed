@@ -29,6 +29,7 @@ struct RssFeed {
   std::shared_ptr<XML::NodeBase> root;
 
   int list_page_selected = 0;
+  int list_page_max_entries = 0;
   ftxui::Component list_page_menu = nullptr;
 };
 
@@ -38,7 +39,11 @@ struct RssFeed {
 struct DefeedCtx {
   enum class Mode { Normal, Cmd };
   enum class Task { Ready, Load, Fetch };
-  enum class Page { Landing, List, Blog };
+  enum class Page { Landing = 0, List, Blog };
+
+  // Move across the DefeedCtx::page hierarchy
+  static void PageUp();
+  static void PageDown();
 
   // clang-format off
   using UrlPair  = std::pair<std::string, size_t>;

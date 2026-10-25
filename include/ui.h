@@ -1,12 +1,12 @@
-#include "ftxui/component/component_base.hpp"
 #include "global.h"
 
+#include <functional>
 #include <future>
+#include <memory>
+#include <string>
 
 #include <ftxui/component/app.hpp>
 #include <ftxui/component/component.hpp>
-#include <memory>
-#include <string>
 
 using namespace std::chrono_literals;
 
@@ -35,6 +35,7 @@ struct LogMenuComponent : public ComponentBase {
   Element OnRender() override;
   bool Focusable() const override;
   static MenuOption menuStyle();
+  bool OnEvent(Event ev) override;
 
 private:
   int log_menu_idx = 0;
@@ -50,6 +51,7 @@ struct CmdLineComponent : public ComponentBase {
   CmdLineComponent(CmdLine *clunit);
   Element OnRender() override;
   bool Focusable() const override;
+  bool OnEvent(Event ev) override;
 
 private:
   std::string cmd;
@@ -59,27 +61,28 @@ private:
 struct Page : public ComponentBase, public MenuOption {
   bool Focusable() const override;
   static MenuOption menuStyle();
+  bool OnEvent(Event ev) override;
+  int GetCurIndex() const;
+  int GetMaxIndex() const;
+
+protected:
+  int selected = 0;
+  int max_entries = 0;
 };
 
 struct LandingPage : public Page {
   explicit LandingPage(const std::vector<std::string> &entries);
   Element OnRender() override;
-  int GetCurIndex() const;
-
-private:
-  int selected = 0;
+  bool OnEvent(Event ev) override;
 };
 
 struct ListPage : public Page {
-  ListPage(const std::vector<std::string> &entries);
+  explicit ListPage(const std::vector<std::string> &entries);
   Element OnRender() override;
+  bool OnEvent(Event ev) override;
   Component UpdateEntries(const std::vector<std::string> &entries);
   void Update(Component child);
-  void Update(Component child, int selected);
-  int GetCurIndex() const;
-
-private:
-  int selected = 0;
+  void Update(Component child, int selected, int max_entries);
 };
 
 class App {
@@ -95,10 +98,13 @@ class App {
   DefeedCtx::Page cur_page = DefeedCtx::Page::Landing;
   int cur_idx = 0;
 
-  void init_app();
+  bool OnEvent(Event ev);
+  std::function<bool(Event)> on_event;
+
   void initialize_components();
   void begin_fetch();
   std::vector<std::string> make_entries_from_feed();
+  void switch_page(DefeedCtx::Page from, DefeedCtx::Page to);
 
 public:
   App();

@@ -3,6 +3,7 @@
 #include <iostream>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <vector>
 
 #include <curl/curl.h>
@@ -92,7 +93,7 @@ DefeedCtx::UrlPairs DefeedCtx::get_urls() {
 }
 
 // TODO: This is increasing couplic for global.cpp, maybe move somewhere else
-std::vector<std::unique_ptr<RssFeed>> DefeedCtx::fetchRSS() {
+std::vector<std::shared_ptr<RssFeed>> DefeedCtx::fetchRSS() {
   DefeedCtx::UrlPairs rss_urls = DefeedCtx::get_urls();
 
   MultiFetcher fetch_rss{};
@@ -128,14 +129,14 @@ std::vector<std::unique_ptr<RssFeed>> DefeedCtx::fetchRSS() {
   cond_fetch_rss.perform_write();
   sb.append("Completed fetches!");
 
-  std::vector<std::unique_ptr<RssFeed>> nodes = DefeedCtx::loadRSS();
+  std::vector<std::shared_ptr<RssFeed>> nodes = DefeedCtx::loadRSS();
 
   return std::move(nodes);
 }
 
 // TODO: This is sequential for now but consider using async in future
-std::vector<std::unique_ptr<RssFeed>> DefeedCtx::loadRSS() {
-  std::vector<std::unique_ptr<RssFeed>> feeds;
+std::vector<std::shared_ptr<RssFeed>> DefeedCtx::loadRSS() {
+  std::vector<std::shared_ptr<RssFeed>> feeds;
   DefeedCtx::UrlPairs rss_urls = DefeedCtx::get_urls();
 
   for (auto [url, hash] : rss_urls) {
@@ -156,8 +157,8 @@ std::vector<std::unique_ptr<RssFeed>> DefeedCtx::loadRSS() {
 }
 
 SharedBuffer::SharedBuffer() {
-  buf.reserve(4096);
-  entries.reserve(4096);
+  buf.reserve(4096 * 8);
+  entries.reserve(4096 * 8);
   lfile.open("log.txt", std::ios::out);
 };
 

@@ -1,5 +1,6 @@
 #include "ui.h"
 #include "global.h"
+#include "xml.h"
 
 #include <cassert>
 #include <future>
@@ -28,14 +29,35 @@ Element LoadingComponent::OnRender() {
 }
 
 LogMenuComponent::LogMenuComponent() {
-  this->log_menu = Menu(&sb.getEntries(), &log_menu_idx);
+  log_menu_idx = 0;
+  entries = sb.getEntries();
+  Component log_menu =
+      Menu(&entries, &log_menu_idx, LogMenuComponent::menuStyle());
+  log_menu |= CatchEvent([this](Event ev) {
+    static int g_count = 0;
+    if (ev == Event::Character("g")) {
+      if (++g_count == 2) {
+        log_menu_idx = 0;
+      }
+      return true;
+    }
+    g_count = 0;
+
+    if (ev == Event::Character("G")) {
+      log_menu_idx = entries.size();
+      return true;
+    }
+
+    return false;
+  });
   Add(log_menu);
 }
 bool LogMenuComponent::Focusable() const { return true; }
 Element LogMenuComponent::OnRender() {
+  entries = sb.getEntries();
   static std::size_t last_entry_idx = log_menu_idx;
 
-  std::size_t cur_entry_count = sb.getTotalEntries();
+  std::size_t cur_entry_count = entries.size();
   if (last_entry_idx != cur_entry_count - 1) {
     if (log_menu_idx == last_entry_idx) {
       log_menu_idx = cur_entry_count - 1;
@@ -43,12 +65,27 @@ Element LogMenuComponent::OnRender() {
   }
   last_entry_idx = cur_entry_count - 1;
 
-  return log_menu->Render() | vscroll_indicator | yframe |
+  return Render() | vscroll_indicator | yframe |
          size(ftxui::HEIGHT, ftxui::EQUAL, 10);
+}
+MenuOption LogMenuComponent::menuStyle() {
+  MenuOption option = MenuOption::Vertical();
+  option.entries_option.transform = [](EntryState state) {
+    Element e = text(" " + state.label + " ");
+    if (state.focused)
+      e = e | bold;
+    if (state.focused)
+      e = e | color(Color::LightCoral);
+
+    if (state.active)
+      e = e | bold;
+    return e;
+  };
+  return option;
 }
 
 StatusLineComponent::StatusLineComponent() {
-  loading = std::make_unique<LoadingComponent>();
+  Component loading = std::make_unique<LoadingComponent>();
   loading |= Maybe([]() { return DefeedCtx::task != DefeedCtx::Task::Ready; });
   Add(loading);
 }
@@ -62,14 +99,12 @@ Element StatusLineComponent::OnRender() {
       case DefeedCtx::Task::Load:  status = "Loading"; break;
     }
   } else status = "Cmd";
-  // clang-format on
 
-  // clang-format off
   return hbox({
     text(" "),
     text(status),
     text(" "),
-    loading->Render(),
+    Render(),
     filler() | yflex,
   }) | bgcolor(Color::Blue)
      | color(Color::White);
@@ -83,7 +118,7 @@ CmdLineComponent::CmdLineComponent(CmdLine *_Nonnull clunit) : clunit(clunit) {
     return state.element;
   };
 
-  input = Input(&cmd, cmd_line_style);
+  Component input = Input(&cmd, cmd_line_style);
   input |= CatchEvent([this](Event event) {
     if (DefeedCtx::mode != DefeedCtx::Mode::Cmd)
       return false;
@@ -106,15 +141,12 @@ CmdLineComponent::CmdLineComponent(CmdLine *_Nonnull clunit) : clunit(clunit) {
   Add(input);
 }
 bool CmdLineComponent::Focusable() const { return true; }
-Element CmdLineComponent::OnRender() { return input->Render(); }
+Element CmdLineComponent::OnRender() { return Render(); }
 
 bool Page::Focusable() const { return true; }
 
 MenuOption Page::menuStyle() {
-  static MenuOption option = MenuOption::Vertical();
-  static short init = 0;
-  if (init)
-    return option;
+  MenuOption option = MenuOption::Vertical();
 
   option.entries_option.transform = [](EntryState state) {
     Element e = state.active ? text("[ " + state.label + " ]")
@@ -128,39 +160,72 @@ MenuOption Page::menuStyle() {
       e = e | bold;
     return e;
   };
-  init++;
   return option;
 }
 
-LandingPage::LandingPage(const std::vector<std::string> &entries)
-    : entries(entries) {
-  home_menu = Menu(entries, &selected, Page::menuStyle());
-  home_menu |= CatchEvent([this](Event ev) {
+LandingPage::LandingPage(const std::vector<std::string> &entries) {
+  selected = 0;
+  Component pg = Menu(entries, &this->selected, Page::menuStyle());
+  pg |= CatchEvent([this](Event ev) {
     if (ev == Event::Return) {
+      DefeedCtx::page = DefeedCtx::Page::List;
     }
     return false;
   });
-  Add(home_menu);
+  Add(pg);
 }
 Element LandingPage::OnRender() {
   // clang-format off
   Element home = vbox({
     text("Home screen"),
     separator(),
-    home_menu->Render(),
+    Render(),
   }) | flex;
   // clang-format on
 
   return home;
 }
+int LandingPage::GetCurIndex() const { return selected; }
+
+ListPage::ListPage(const std::vector<std::string> &entries) {
+  UpdateEntries(entries);
+}
+Element ListPage::OnRender() { return Render(); }
+Component ListPage::UpdateEntries(const std::vector<std::string> &entries) {
+  selected = 0;
+  Component pg = Menu(entries, &selected, Page::menuStyle());
+  pg |= CatchEvent([](Event ev) {
+    if (ev == Event::Escape || ev == Event::Character('-')) {
+      DefeedCtx::page = DefeedCtx::Page::Landing;
+    }
+    return false;
+  });
+  Update(pg);
+  return pg;
+}
+void ListPage::Update(Component child) {
+  selected = 0;
+  DetachAllChildren();
+  Add(std::move(child));
+}
+void ListPage::Update(Component child, int selected) {
+  this->selected = selected;
+  DetachAllChildren();
+  Add(std::move(child));
+}
+int ListPage::GetCurIndex() const { return selected; }
 
 void App::init_app() {
   // clang-format off
   app = Container::Vertical({
-    page,
+    // pages
+    Maybe(page_landing, [this] { return cur_page == DefeedCtx::Page::Landing; }),
+    Maybe(page_list, [this] { return cur_page == DefeedCtx::Page::List; }),
+    Renderer([] { return filler(); }),
+
     status_line,
-    log,
-    cmd_line
+    Maybe(log, &DefeedCtx::show_logs),
+    Maybe(cmd_line, [] { return DefeedCtx::mode == DefeedCtx::Mode::Cmd; }),
   });
   // clang-format on
 
@@ -183,7 +248,8 @@ void App::init_app() {
 
     if (event == Event::Character('l')) {
       DefeedCtx::show_logs = !DefeedCtx::show_logs;
-      log->TakeFocus();
+      if (DefeedCtx::show_logs)
+        log->TakeFocus();
       return true;
     }
 
@@ -200,14 +266,11 @@ void App::init_app() {
 
 // clang-format off
 void App::initialize_components() {
-  log         = std::make_unique<LogMenuComponent>();
-  page        = std::make_unique<LandingPage>(make_entries_from_feed());
-  cmd_line    = std::make_unique<CmdLineComponent>(&cmd_exec_unit);
-  status_line = std::make_unique<StatusLineComponent>();
-
-  log      |= Maybe(&DefeedCtx::show_logs);
-  cmd_line |= Maybe([this] { return DefeedCtx::mode == DefeedCtx::Mode::Cmd; });
-
+  log          = std::make_shared<LogMenuComponent>();
+  cmd_line     = std::make_shared<CmdLineComponent>(&cmd_exec_unit);
+  status_line  = std::make_unique<StatusLineComponent>();
+  page_list    = std::make_shared<ListPage>((std::vector<std::string>){});
+  page_landing = std::make_shared<LandingPage>(make_entries_from_feed());
   init_app();
 }
 // clang-format on
@@ -251,6 +314,65 @@ void App::EventLoop() {
       case std::future_status::timeout:
         break;
       };
+    }
+
+    if (cur_page != DefeedCtx::page) {
+      if (cur_page == DefeedCtx::Page::Landing) {
+        std::shared_ptr<LandingPage> lpg =
+            std::static_pointer_cast<LandingPage>(page_landing);
+        assert(lpg != nullptr && "Landing page must not be nullptr");
+        int selected = lpg->GetCurIndex();
+        std::shared_ptr<RssFeed> feed = feeds[selected];
+        std::shared_ptr<ListPage> lipg =
+            std::static_pointer_cast<ListPage>(page_list);
+
+        if (feed->list_page_menu == nullptr) {
+          std::shared_ptr<XML::Node> root =
+              std::static_pointer_cast<XML::Node>(feed->root);
+          std::vector<std::unique_ptr<XML::NodeBase>> &items =
+              static_cast<XML::Node *>(root->children["channel"][0].get())
+                  ->children["item"];
+
+          std::vector<std::string> entries{};
+          for (int i = 0; i < items.size(); i++) {
+            XML::Leaf *title = static_cast<XML::Leaf *>(
+                static_cast<XML::Node *>(items[i].get())
+                    ->children["title"][0]
+                    .get());
+            if (title == nullptr) {
+              sb.append("Title is nullptr");
+              continue;
+            }
+            if (title->content_idx != 0) {
+              sb.append("Title is HTML data");
+              continue;
+            }
+            std::string temp = std::get<0>(title->content);
+            entries.push_back(temp);
+          }
+          feed->list_page_menu = lipg->UpdateEntries(entries);
+        } else {
+          lipg->Update(feed->list_page_menu, feed->list_page_selected);
+        }
+
+        page_list->TakeFocus();
+
+        // DBGer aboba(feed);
+      } else if (DefeedCtx::page == DefeedCtx::Page::Landing) {
+        if (cur_page == DefeedCtx::Page::List) {
+          std::shared_ptr<LandingPage> lpg =
+              std::static_pointer_cast<LandingPage>(page_landing);
+          std::shared_ptr<ListPage> lipg =
+              std::static_pointer_cast<ListPage>(page_list);
+
+          // list_page_menu is populated only at alloc time, but
+          // list_page_selected needs to be updated every page switch
+          int selected = lpg->GetCurIndex();
+          feeds[selected]->list_page_selected = lipg->GetCurIndex();
+        }
+        page_landing->TakeFocus();
+      }
+      cur_page = DefeedCtx::page;
     }
 
     screen.RequestAnimationFrame();

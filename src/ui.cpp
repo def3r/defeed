@@ -73,7 +73,7 @@ LogMenuComponent::LogMenuComponent() {
       Menu(&entries, &log_menu_idx, LogMenuComponent::menuStyle());
   Add(log_menu);
 }
-bool LogMenuComponent::Focusable() const { return true; }
+bool LogMenuComponent::Focusable() const { return DefeedCtx::show_logs; }
 Element LogMenuComponent::OnRender() {
   entries = sb.getEntries();
   static std::size_t last_entry_idx = log_menu_idx;
@@ -95,6 +95,7 @@ bool LogMenuComponent::OnEvent(Event ev) {
 
   if (ev == Event::Character("q")) {
     DefeedCtx::show_logs = false;
+    DefeedCtx::shift_focus = true;
     return true;
   }
 
@@ -104,13 +105,8 @@ MenuOption LogMenuComponent::menuStyle() {
   MenuOption option = MenuOption::Vertical();
   option.entries_option.transform = [](EntryState state) {
     Element e = text(" " + state.label + " ");
-    if (state.focused)
-      e = e | bold;
-    if (state.focused)
-      e = e | color(Color::LightCoral);
-
     if (state.active)
-      e = e | bold;
+      e = e | bold | color(Color::LightCoral);
     return e;
   };
   return option;
@@ -181,13 +177,8 @@ MenuOption Page::menuStyle() {
   option.entries_option.transform = [](EntryState state) {
     Element e = state.active ? text("[ " + state.label + " ]")
                              : text("  " + state.label + "  ");
-    if (state.focused)
-      e = e | bold;
-    if (state.focused)
-      e = e | color(Color::Blue);
-
     if (state.active)
-      e = e | bold;
+      e = e | bold | color(Color::Blue);
     return e;
   };
   return option;
@@ -279,7 +270,7 @@ void App::initialize_components() {
       | size(ftxui::HEIGHT, ftxui::LESS_THAN, 10),
     Maybe(cmd_line, [] { return DefeedCtx::mode == DefeedCtx::Mode::Cmd; })
       | size(ftxui::HEIGHT, ftxui::EQUAL,     1),
-  })
+  }, &active_page)
     | CatchEvent(on_event);
 }
 // clang-format on
@@ -354,7 +345,17 @@ void App::switch_page(DefeedCtx::Page from, DefeedCtx::Page to) {
   cur_page = to;
 }
 
+void App::update_on_msg() {
+  if (DefeedCtx::shift_focus) {
+    active_page = static_cast<int>(DefeedCtx::page);
+    app->TakeFocus();
+    DefeedCtx::shift_focus = false;
+  }
+}
+
 bool App::OnEvent(Event ev) {
+  update_on_msg();
+
   if (DefeedCtx::mode != DefeedCtx::Mode::Normal)
     return false;
 
@@ -376,8 +377,11 @@ bool App::OnEvent(Event ev) {
 
   if (ev == Event::Character('l')) {
     DefeedCtx::show_logs = !DefeedCtx::show_logs;
-    if (DefeedCtx::show_logs)
+    if (DefeedCtx::show_logs) {
       log->TakeFocus();
+    } else {
+      DefeedCtx::shift_focus = true;
+    }
     return true;
   }
 
@@ -439,8 +443,11 @@ bool CmdLine::Exec(std::string &cmd) {
   bool retval = true;
 
   if (cmd == "log") {
-    DefeedCtx::show_logs = !DefeedCtx::show_logs;
-    parent->log->TakeFocus();
+    if ((DefeedCtx::show_logs = !DefeedCtx::show_logs)) {
+      parent->log->TakeFocus();
+    } else {
+      DefeedCtx::shift_focus = true;
+    }
   } else if (cmd == "q") {
     DefeedCtx::quit = true;
   } else if (cmd == "fetch") {

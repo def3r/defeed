@@ -95,6 +95,7 @@ class App {
   CmdLine cmd_exec_unit;
   Component log, status_line, cmd_line, app;
   Component page_landing, page_list;
+  int active_page = 0;
   DefeedCtx::Page cur_page = DefeedCtx::Page::Landing;
   int cur_idx = 0;
 
@@ -105,6 +106,7 @@ class App {
   void begin_fetch();
   std::vector<std::string> make_entries_from_feed();
   void switch_page(DefeedCtx::Page from, DefeedCtx::Page to);
+  void update_on_msg();
 
 public:
   App();

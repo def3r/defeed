@@ -1,25 +1,3 @@
-#include <cstdlib>
-#include <cstring>
-#include <functional>
-#include <future>
-#include <iostream>
-#include <string>
-#include <thread>
-#include <vector>
-
-#include <curl/curl.h>
-#include <curl/multi.h>
-#include <ftxui/component/app.hpp>
-#include <ftxui/component/component.hpp>
-#include <ftxui/component/event.hpp>
-#include <ftxui/component/loop.hpp>
-#include <ftxui/dom/elements.hpp>
-#include <ftxui/screen/screen.hpp>
-#include <libxml/HTMLparser.h>
-#include <libxml/HTMLtree.h>
-#include <libxml/parser.h>
-#include <libxml/tree.h>
-
 #include "global.h"
 #include "ui.h"
 

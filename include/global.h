@@ -59,6 +59,7 @@ struct DefeedCtx {
   static inline Task task = Task::Ready;
   static inline Mode mode = Mode::Normal;
   static inline Page page = Page::Landing;
+  static inline bool shift_focus = false;
 
   static void init();
   static void setup_dirs();

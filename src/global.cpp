@@ -10,6 +10,7 @@
 
 #include "fetcher.h"
 #include "global.h"
+#include "xml.h"
 
 CurlGlobal::CurlGlobal() {}
 
@@ -58,7 +59,7 @@ void DefeedCtx::init() {
   home = env_home;
   defeed = home + "/.defeed";
   rss = defeed + "/rss";
-  rss_txt = rss + ".txt";
+  rss_xml = rss + ".xml";
   rss_info = rss + ".info";
 }
 
@@ -75,7 +76,7 @@ void DefeedCtx::setup_dirs() {
       std::cerr << "Unable to create dir: " << defeed_dir << std::endl;
       std::exit(1);
     }
-    std::ofstream rss_file{DefeedCtx::rss_txt};
+    std::ofstream rss_file{DefeedCtx::rss_xml};
     rss_file.close();
   }
 }
@@ -88,21 +89,41 @@ DefeedCtx::UrlPairs DefeedCtx::get_urls() {
     return rss_urls;
   }
 
-  std::ifstream rss_txt{DefeedCtx::rss_txt};
-  if (!rss_txt.is_open()) {
-    std::cerr << "Cant open file " << DefeedCtx::rss_txt << std::endl;
-    std::exit(1);
-  }
+  XML::Extract parse_xml(DefeedCtx::rss_xml);
+  parse_xml.extract();
+  std::shared_ptr<XML::NodeBase> root = parse_xml.get_root();
+  Walker w(root.get());
 
-  while (!rss_txt.eof()) {
-    std::string url{};
-    std::getline(rss_txt, url);
-    if (!url.empty()) {
-      size_t hash = std::hash<std::string>{}(url);
-      sb.append(std::to_string(hash) + "\t\t" + url);
-      rss_urls.push_back({url, hash});
+  XML::Node *r = static_cast<XML::Node *>(root.get());
+  if (r->children["category"].empty()) {
+    sb.append("Category not found");
+    return {};
+  } else if (XML::Leaf *child =
+                 static_cast<XML::Leaf *>(r->children["category"][0].get())) {
+    if (child->content_idx != 0) {
+      sb.append("Expected a string but got HTML in <category>");
+      return {};
+    } else if (std::get<0>(child->content) != "rss") {
+      sb.append("Expected rss but got " + std::get<0>(child->content) +
+                " in <category>");
+      return {};
     }
   }
+
+  std::vector<std::shared_ptr<XML::NodeBase>> &items = r->children["item"];
+  for (int i = 0; i < items.size(); i++) {
+    XML::Leaf *l = static_cast<XML::Leaf *>(
+        static_cast<XML::Node *>(items[i].get())->children["link"][0].get());
+    if (l->content_idx != 0) {
+      sb.append("link not string but HTML");
+      continue;
+    }
+    std::string url = std::get<0>(l->content);
+    size_t hash = std::hash<std::string>{}(url);
+    sb.append(std::to_string(hash) + "\t\t" + url);
+    rss_urls.push_back({url, hash});
+  }
+
   return rss_urls;
 }
 

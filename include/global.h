@@ -51,7 +51,7 @@ struct DefeedCtx {
   // clang-format on
 
   static inline std::string home{}, defeed{};
-  static inline std::string rss{}, rss_txt{}, rss_info{};
+  static inline std::string rss{}, rss_xml{}, rss_info{};
 
   // mostly UI specific
   static inline bool quit = false;
@@ -101,6 +101,12 @@ struct Walker {
   std::fstream fs;
   XML::NodeBase *root;
   Walker(RssFeed *_Nonnull feed) : root(feed->root.get()) {
+    fs.open(filename, std::ios::out);
+    fs << "[ROOT]\n";
+    walk_internal(0, (XML::Node *)root);
+    fs.close();
+  }
+  Walker(XML::NodeBase *_Nonnull feed) : root(feed) {
     fs.open(filename, std::ios::out);
     fs << "[ROOT]\n";
     walk_internal(0, (XML::Node *)root);

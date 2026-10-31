@@ -23,7 +23,7 @@ struct NodeBase {
 };
 
 using Children =
-    std::unordered_map<std::string, std::vector<std::unique_ptr<NodeBase>>>;
+    std::unordered_map<std::string, std::vector<std::shared_ptr<NodeBase>>>;
 
 struct Node : public NodeBase {
   Children children;
@@ -34,7 +34,7 @@ struct Node : public NodeBase {
 };
 
 struct Leaf : public NodeBase {
-  std::variant<std::string, std::unique_ptr<HTML::NodeBase>> content;
+  std::variant<std::string, std::shared_ptr<HTML::NodeBase>> content;
   int content_idx;
 
   Leaf();
@@ -73,7 +73,7 @@ public:
   // Calling function assign
   // Called  function allocates
   void extract();
-  std::unique_ptr<NodeBase> get_root();
+  std::shared_ptr<NodeBase> get_root();
 
   void walk();
 
@@ -81,10 +81,10 @@ private:
   std::string xml_file;
   xmlDoc *doc;
   xmlNode *root;
-  std::unique_ptr<NodeBase> root_node;
+  std::shared_ptr<NodeBase> root_node;
 
-  std::unique_ptr<NodeBase> make_leaf(xmlNode *cur_node);
-  std::unique_ptr<NodeBase> make_internal(xmlNode *cur_node);
+  std::shared_ptr<NodeBase> make_leaf(xmlNode *cur_node);
+  std::shared_ptr<NodeBase> make_internal(xmlNode *cur_node);
 
   void walk_root_node(NodeBase *root);
 };

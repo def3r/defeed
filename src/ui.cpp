@@ -306,7 +306,7 @@ void App::switch_page(DefeedCtx::Page from, DefeedCtx::Page to) {
     if (feed->list_page_menu == nullptr) {
       std::shared_ptr<XML::Node> root =
           std::static_pointer_cast<XML::Node>(feed->root);
-      std::vector<std::unique_ptr<XML::NodeBase>> &items =
+      std::vector<std::shared_ptr<XML::NodeBase>> &items =
           (static_cast<XML::Node *>(root->children["channel"][0].get()))
               ->children["item"];
 

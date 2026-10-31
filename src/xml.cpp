@@ -82,7 +82,7 @@ void Extract::walk() {
   walk_root_node(root_node.get());
 }
 
-std::unique_ptr<NodeBase> Extract::get_root() { return std::move(root_node); }
+std::shared_ptr<NodeBase> Extract::get_root() { return std::move(root_node); }
 
 void Extract::walk_root_node(NodeBase *root) {
   if (root == nullptr) {
@@ -106,7 +106,7 @@ void Extract::walk_root_node(NodeBase *root) {
   }
 }
 
-std::unique_ptr<NodeBase> Extract::make_leaf(xmlNode *cur_node) {
+std::shared_ptr<NodeBase> Extract::make_leaf(xmlNode *cur_node) {
   if (cur_node == nullptr) {
     return nullptr;
   }
@@ -135,7 +135,7 @@ std::unique_ptr<NodeBase> Extract::make_leaf(xmlNode *cur_node) {
   return std::move(leaf);
 }
 
-std::unique_ptr<NodeBase> Extract::make_internal(xmlNode *cur_node) {
+std::shared_ptr<NodeBase> Extract::make_internal(xmlNode *cur_node) {
   if (cur_node == nullptr) {
     return nullptr;
   }
@@ -145,7 +145,7 @@ std::unique_ptr<NodeBase> Extract::make_internal(xmlNode *cur_node) {
   for (node = cur_node; node; node = node->next) {
     if (node->type == XML_ELEMENT_NODE) {
       std::string name{(const char *)(node->name)};
-      std::unique_ptr<NodeBase> internal_node =
+      std::shared_ptr<NodeBase> internal_node =
           (name == "item" || name == "image" || name == "channel")
               ? make_internal(node->children)
               : make_leaf(node->children);

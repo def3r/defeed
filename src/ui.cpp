@@ -304,18 +304,15 @@ void App::switch_page(DefeedCtx::Page from, DefeedCtx::Page to) {
   if (from == DefeedCtx::Page::Landing && to == DefeedCtx::Page::List) {
     // Creating the page for the first time
     if (feed->list_page_menu == nullptr) {
-      std::shared_ptr<XML::Node> root =
-          std::static_pointer_cast<XML::Node>(feed->root);
-      std::vector<std::shared_ptr<XML::NodeBase>> &items =
-          (static_cast<XML::Node *>(root->children["channel"][0].get()))
+      XML::Internal root = XML_CAST_INTERNAL(feed->root);
+      XML::Siblings &items =
+          (XML_CAST_INTERNALBASE(root->children["channel"][0]))
               ->children["item"];
 
       std::vector<std::string> entries{};
       for (int i = 0; i < items.size(); i++) {
-        XML::Leaf *title =
-            static_cast<XML::Leaf *>(static_cast<XML::Node *>(items[i].get())
-                                         ->children["title"][0]
-                                         .get());
+        XML::LeafBase *title = XML_CAST_LEAFBASE(
+            XML_CAST_INTERNALBASE(items[i])->children["title"][0]);
         if (title == nullptr) {
           sb.append("[PAGE] Title is nullptr");
           continue;

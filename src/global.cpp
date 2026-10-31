@@ -91,15 +91,15 @@ DefeedCtx::UrlPairs DefeedCtx::get_urls() {
 
   XML::Extract parse_xml(DefeedCtx::rss_xml);
   parse_xml.extract();
-  std::shared_ptr<XML::NodeBase> root = parse_xml.get_root();
+  XML::Node root = parse_xml.get_root();
   Walker w(root.get());
 
-  XML::Node *r = static_cast<XML::Node *>(root.get());
+  XML::Internal r = XML_CAST_INTERNAL(root);
   if (r->children["category"].empty()) {
     sb.append("Category not found");
     return {};
-  } else if (XML::Leaf *child =
-                 static_cast<XML::Leaf *>(r->children["category"][0].get())) {
+  } else if (XML::LeafBase *child = static_cast<XML::LeafBase *>(
+                 r->children["category"][0].get())) {
     if (child->content_idx != 0) {
       sb.append("Expected a string but got HTML in <category>");
       return {};
@@ -110,10 +110,10 @@ DefeedCtx::UrlPairs DefeedCtx::get_urls() {
     }
   }
 
-  std::vector<std::shared_ptr<XML::NodeBase>> &items = r->children["item"];
+  const XML::Siblings &items = r->children["item"];
   for (int i = 0; i < items.size(); i++) {
-    XML::Leaf *l = static_cast<XML::Leaf *>(
-        static_cast<XML::Node *>(items[i].get())->children["link"][0].get());
+    XML::Leaf l =
+        XML_CAST_LEAF((XML_CAST_INTERNAL(items[i]))->children["link"][0]);
     if (l->content_idx != 0) {
       sb.append("link not string but HTML");
       continue;

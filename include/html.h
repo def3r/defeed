@@ -38,7 +38,7 @@ using TEXT = Leaf;
 
 static std::unique_ptr<HTML::NodeBase> make_leaf(xmlNode *cur_node);
 static std::unique_ptr<HTML::NodeBase> make_internal(xmlNode *cur_node);
-std::unique_ptr<HTML::NodeBase> extract(const xmlChar *str);
+std::shared_ptr<HTML::NodeBase> extract(const xmlChar *str);
 void walk(HTML::NodeBase *root);
 
 } // namespace HTML

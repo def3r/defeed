@@ -9,12 +9,12 @@
 
 namespace XML {
 
-Node::Node() {
+InternalBase::InternalBase() {
   this->type = NodeType::Internal;
   this->attrs = {};
 }
 
-Leaf::Leaf() {
+LeafBase::LeafBase() {
   this->type = NodeType::Leaf;
   this->attrs = {};
   content_idx = 0;
@@ -82,14 +82,14 @@ void Extract::walk() {
   walk_root_node(root_node.get());
 }
 
-std::shared_ptr<NodeBase> Extract::get_root() { return std::move(root_node); }
+Node Extract::get_root() { return std::move(root_node); }
 
 void Extract::walk_root_node(NodeBase *root) {
   if (root == nullptr) {
     return;
   }
   if (root->type == NodeType::Internal) {
-    Node *node = static_cast<Node *>(root);
+    InternalBase *node = static_cast<InternalBase *>(root);
     for (auto it = node->children.begin(); it != node->children.end(); ++it) {
       sb.append("NODE: " + it->first);
       for (auto &item : it->second) {
@@ -97,7 +97,7 @@ void Extract::walk_root_node(NodeBase *root) {
       }
     }
   } else {
-    Leaf *leaf = static_cast<Leaf *>(root);
+    LeafBase *leaf = static_cast<LeafBase *>(root);
     if (leaf->content_idx == 0) {
       sb.append("TEXT: " + std::get<0>(leaf->content));
     } else {
@@ -106,13 +106,13 @@ void Extract::walk_root_node(NodeBase *root) {
   }
 }
 
-std::shared_ptr<NodeBase> Extract::make_leaf(xmlNode *cur_node) {
+Node Extract::make_leaf(xmlNode *cur_node) {
   if (cur_node == nullptr) {
     return nullptr;
   }
 
   xmlNode *node;
-  std::unique_ptr<Leaf> leaf = std::make_unique<Leaf>();
+  Leaf leaf = std::make_unique<LeafBase>();
   for (node = cur_node; node; node = node->next) {
     if (node->type == XML_TEXT_NODE) {
       if (node->content) {
@@ -135,17 +135,17 @@ std::shared_ptr<NodeBase> Extract::make_leaf(xmlNode *cur_node) {
   return std::move(leaf);
 }
 
-std::shared_ptr<NodeBase> Extract::make_internal(xmlNode *cur_node) {
+Node Extract::make_internal(xmlNode *cur_node) {
   if (cur_node == nullptr) {
     return nullptr;
   }
 
   xmlNode *node;
-  std::unique_ptr<Node> node_obj = std::make_unique<Node>();
+  Internal node_obj = std::make_shared<InternalBase>();
   for (node = cur_node; node; node = node->next) {
     if (node->type == XML_ELEMENT_NODE) {
       std::string name{(const char *)(node->name)};
-      std::shared_ptr<NodeBase> internal_node =
+      Node internal_node =
           (name == "item" || name == "image" || name == "channel")
               ? make_internal(node->children)
               : make_leaf(node->children);

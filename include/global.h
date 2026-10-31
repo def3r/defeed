@@ -103,17 +103,17 @@ struct Walker {
   Walker(RssFeed *_Nonnull feed) : root(feed->root.get()) {
     fs.open(filename, std::ios::out);
     fs << "[ROOT]\n";
-    walk_internal(0, (XML::Node *)root);
+    walk_internal(0, (XML::InternalBase *)root);
     fs.close();
   }
   Walker(XML::NodeBase *_Nonnull feed) : root(feed) {
     fs.open(filename, std::ios::out);
     fs << "[ROOT]\n";
-    walk_internal(0, (XML::Node *)root);
+    walk_internal(0, (XML::InternalBase *)root);
     fs.close();
   }
 
-  void walk_internal(int level, XML::Node *root) {
+  void walk_internal(int level, XML::InternalBase *root) {
     if (root == nullptr)
       return;
 
@@ -129,15 +129,15 @@ struct Walker {
           continue;
         }
         if (child->type == XML::NodeType::Internal) {
-          walk_internal(level + 4, (XML::Node *)child);
+          walk_internal(level + 4, (XML::InternalBase *)child);
         } else {
-          walk_leaf(level + 4, (XML::Leaf *)child);
+          walk_leaf(level + 4, (XML::LeafBase *)child);
         }
       }
     }
   }
 
-  void walk_leaf(int level, XML::Leaf *root) {
+  void walk_leaf(int level, XML::LeafBase *root) {
     if (root == nullptr)
       return;
 

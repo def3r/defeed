@@ -103,7 +103,7 @@ static std::unique_ptr<HTML::NodeBase> make_internal(xmlNode *cur_node) {
   return std::move(node_obj);
 }
 
-std::unique_ptr<HTML::NodeBase> extract(const xmlChar *str) {
+std::shared_ptr<HTML::NodeBase> extract(const xmlChar *str) {
   if (str == nullptr) {
     sb.append("HTML::extract : passed nullptr for in memory str");
     return {};

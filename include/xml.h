@@ -22,38 +22,43 @@ struct NodeBase {
   Attributes attrs;
 };
 
-using Children =
-    std::unordered_map<std::string, std::vector<std::shared_ptr<NodeBase>>>;
+// clang-format off
+using Node     = std::shared_ptr<NodeBase>;
+using Siblings = std::vector<Node>;
+using Children = std::unordered_map<std::string, Siblings>;
+// clang-format on
 
-struct Node : public NodeBase {
+struct InternalBase : public NodeBase {
   Children children;
 
-  Node();
+  InternalBase();
 
   // TODO: Here Do we need to destroy the children explicitly?
 };
+using Internal = std::shared_ptr<InternalBase>;
 
-struct Leaf : public NodeBase {
+struct LeafBase : public NodeBase {
   std::variant<std::string, std::shared_ptr<HTML::NodeBase>> content;
   int content_idx;
 
-  Leaf();
+  LeafBase();
 };
+using Leaf = std::shared_ptr<XML::LeafBase>;
 
 // clang-format off
-using Channel       = Node;
-using Item          = Node;
-using Image         = Node;
-using Title         = Leaf;
-using Link          = Leaf;
-using Description   = Leaf;
-using Content       = Leaf;
-using LastBuildDate = Leaf;
-using PubDate       = Leaf;
-using URL           = Leaf;
-using Width         = Leaf;
-using Height        = Leaf;
-using GUID          = Leaf;
+using Channel       = InternalBase;
+using Item          = InternalBase;
+using Image         = InternalBase;
+using Title         = LeafBase;
+using Link          = LeafBase;
+using Description   = LeafBase;
+using Content       = LeafBase;
+using LastBuildDate = LeafBase;
+using PubDate       = LeafBase;
+using URL           = LeafBase;
+using Width         = LeafBase;
+using Height        = LeafBase;
+using GUID          = LeafBase;
 // clang-format on
 
 class Extract {
@@ -73,7 +78,7 @@ public:
   // Calling function assign
   // Called  function allocates
   void extract();
-  std::shared_ptr<NodeBase> get_root();
+  Node get_root();
 
   void walk();
 
@@ -81,12 +86,26 @@ private:
   std::string xml_file;
   xmlDoc *doc;
   xmlNode *root;
-  std::shared_ptr<NodeBase> root_node;
+  Node root_node;
 
-  std::shared_ptr<NodeBase> make_leaf(xmlNode *cur_node);
-  std::shared_ptr<NodeBase> make_internal(xmlNode *cur_node);
+  Node make_leaf(xmlNode *cur_node);
+  Node make_internal(xmlNode *cur_node);
 
   void walk_root_node(NodeBase *root);
 };
 
+//
+// Cast from shared_ptr<NodeBase> to
+//
+#define XML_CAST_INTERNAL(FROM_NODE)                                           \
+  std::static_pointer_cast<XML::InternalBase>(FROM_NODE)
+
+#define XML_CAST_INTERNALBASE(FROM_NODE)                                       \
+  static_cast<XML::InternalBase *>(FROM_NODE.get())
+
+#define XML_CAST_LEAF(FROM_NODE)                                               \
+  std::static_pointer_cast<XML::LeafBase>(FROM_NODE)
+
+#define XML_CAST_LEAFBASE(FROM_NODE)                                           \
+  static_cast<XML::LeafBase *>(FROM_NODE.get())
 } // namespace XML

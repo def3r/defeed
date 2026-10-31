@@ -12,21 +12,21 @@
 
 namespace HTML {
 
-Node::Node() {
+InternalBase::InternalBase() {
   this->type = NodeType::Internal;
   this->attrs = {};
 }
 
-Leaf::Leaf() {
+LeafBase::LeafBase() {
   this->type = NodeType::Leaf;
   this->attrs = {};
 }
 
-static std::unique_ptr<HTML::NodeBase> make_leaf(xmlNode *cur_node) {
+static Node make_leaf(xmlNode *cur_node) {
   if (cur_node == nullptr) {
     return nullptr;
   }
-  std::unique_ptr<HTML::Leaf> leaf = std::make_unique<HTML::Leaf>();
+  Leaf leaf = std::make_shared<HTML::LeafBase>();
   if (cur_node->type == HTML_TEXT_NODE && cur_node->content) {
     // std::cout << "\t\tTEXT: " << cur_node->content << ": "
     //           << std::strlen((char *)cur_node->content) << std::endl;
@@ -42,7 +42,7 @@ static std::unique_ptr<HTML::NodeBase> make_leaf(xmlNode *cur_node) {
   return std::move(leaf);
 }
 
-static std::unique_ptr<HTML::NodeBase> make_internal(xmlNode *cur_node) {
+static Node make_internal(xmlNode *cur_node) {
   if (cur_node == nullptr) {
     return nullptr;
   }
@@ -62,7 +62,7 @@ static std::unique_ptr<HTML::NodeBase> make_internal(xmlNode *cur_node) {
   //   return make_internal(cur_node->children);
   // }
 
-  std::unique_ptr<HTML::Node> node_obj = std::make_unique<HTML::Node>();
+  Internal node_obj = std::make_shared<HTML::InternalBase>();
   node_obj->attrs["HTMLNodeName"] = cur_node_name;
   xmlAttrPtr attrs = cur_node->properties;
   for (; attrs; attrs = attrs->next) {
@@ -85,7 +85,7 @@ static std::unique_ptr<HTML::NodeBase> make_internal(xmlNode *cur_node) {
   }
 
   xmlNode *node = nullptr;
-  std::unique_ptr<NodeBase> child;
+  Node child;
   for (node = cur_node->children; node; node = node->next) {
     if (node->type == XML_TEXT_NODE) {
       child = make_leaf(node);
@@ -103,7 +103,7 @@ static std::unique_ptr<HTML::NodeBase> make_internal(xmlNode *cur_node) {
   return std::move(node_obj);
 }
 
-std::shared_ptr<HTML::NodeBase> extract(const xmlChar *str) {
+Node extract(const xmlChar *str) {
   if (str == nullptr) {
     sb.append("HTML::extract : passed nullptr for in memory str");
     return {};
@@ -119,7 +119,7 @@ std::shared_ptr<HTML::NodeBase> extract(const xmlChar *str) {
     std::abort();
   }
   xmlNode *root = xmlDocGetRootElement(doc);
-  std::unique_ptr<NodeBase> root_node = make_internal(root);
+  Node root_node = make_internal(root);
 
   xmlFreeDoc(doc);
 
@@ -137,10 +137,10 @@ void walk(HTML::NodeBase *root) {
   }
 
   if (root->type == HTML::NodeType::Leaf) {
-    HTML::Leaf *leaf = static_cast<HTML::Leaf *>(root);
+    HTML::LeafBase *leaf = static_cast<HTML::LeafBase *>(root);
     sb.append("\t\tContents: " + leaf->content);
   } else {
-    HTML::Node *node = static_cast<HTML::Node *>(root);
+    HTML::InternalBase *node = static_cast<HTML::InternalBase *>(root);
     for (int i = 0; i < node->children.size(); i++) {
       HTML::NodeBase *child = node->children[i].get();
       walk(child);

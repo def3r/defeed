@@ -20,25 +20,28 @@ struct NodeBase {
   Attributes attrs;
 };
 
-using Children = std::vector<std::unique_ptr<NodeBase>>;
+using Node = std::shared_ptr<NodeBase>;
+using Children = std::vector<Node>;
 
-struct Node : public NodeBase {
+struct InternalBase : public NodeBase {
   Children children;
-  Node();
+  InternalBase();
   // TODO: Here Do we need to destroy the children explicitly?
 };
+using Internal = std::shared_ptr<InternalBase>;
 
-struct Leaf : public NodeBase {
+struct LeafBase : public NodeBase {
   std::string content;
-  Leaf();
+  LeafBase();
 };
+using Leaf = std::shared_ptr<LeafBase>;
 
 // The only leaf node?
-using TEXT = Leaf;
+using TEXT = LeafBase;
 
-static std::unique_ptr<HTML::NodeBase> make_leaf(xmlNode *cur_node);
-static std::unique_ptr<HTML::NodeBase> make_internal(xmlNode *cur_node);
-std::shared_ptr<HTML::NodeBase> extract(const xmlChar *str);
+static Node make_leaf(xmlNode *cur_node);
+static Node make_internal(xmlNode *cur_node);
+Node extract(const xmlChar *str);
 void walk(HTML::NodeBase *root);
 
 } // namespace HTML

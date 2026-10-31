@@ -226,10 +226,9 @@ ListPage::ListPage(const std::vector<std::string> &entries) {
 }
 Element ListPage::OnRender() {
   Dimensions dims = ftxui::Terminal::Size();
+  int pg_size = dims.dimy - (DefeedCtx::show_logs ? 11 : 2);
   return Render() | vscroll_indicator | yframe |
-         size(ftxui::HEIGHT, ftxui::LESS_THAN,
-              dims.dimy - (DefeedCtx::show_logs ? 10 : 2));
-  ;
+         size(ftxui::HEIGHT, ftxui::LESS_THAN, pg_size);
 }
 Component ListPage::UpdateEntries(const std::vector<std::string> &entries) {
   selected = 0;

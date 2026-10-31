@@ -38,7 +38,7 @@ struct InternalBase : public NodeBase {
 using Internal = std::shared_ptr<InternalBase>;
 
 struct LeafBase : public NodeBase {
-  std::variant<std::string, std::shared_ptr<HTML::NodeBase>> content;
+  std::variant<std::string, HTML::Node> content;
   int content_idx;
 
   LeafBase();

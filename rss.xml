@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<defeed>
+  <category>rss</category>
+  <item><link>https://daniel.haxx.se/blog/feed/</link></item>
+  <item><link>https://xkcd.com/rss.xml</link></item>
+  <item><link>https://www.seantallen.com/index.xml</link></item>
+  <item><link>https://mo.io/rss.xml</link></item>
+  <item><link>https://www.stephendiehl.com/feed.xml</link></item>
+  <item><link>https://maskray.me/blog/atom.xml</link></item>
+  <item><link>https://mcyoung.xyz/feed.xml</link></item>
+  <item><link>https://www.npopov.com/rss</link></item>
+</defeed>

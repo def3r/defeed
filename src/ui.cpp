@@ -250,6 +250,62 @@ void ListPage::Update(Component child, int selected, int max_entries) {
 }
 bool ListPage::OnEvent(Event ev) { return Page::OnEvent(ev); }
 
+TabPage::TabPage(const std::vector<std::string> &entries) {
+  this->entries = entries;
+  menu_idx = 0;
+
+  Component xmldetail = std::make_shared<XMLDetailPage>(DefeedCtx::rss_xml);
+  Component menu = Menu(&this->entries, &menu_idx);
+  Component tab = Container::Tab({xmldetail}, &menu_idx);
+  Component tab_hori = Container::Horizontal({menu, tab});
+  Add(tab_hori);
+}
+
+XMLDetailPage::XMLDetailPage(const std::string &filename) {
+  this->filename = filename;
+  auto action = [&] { sb.append("Clicked"); };
+
+  // TODO: Add a way for XML::Extract to do this
+  std::ifstream fs{filename};
+  if (!fs.is_open()) {
+    sb.append("[XMLDetailPage ctor]: Unable to open file: " + filename);
+    Add(Renderer(
+        [] { return text("[XMLDetailPage ctor]: Unable to open file"); }));
+    return;
+  }
+  fs.close();
+
+  XML::Extract x{filename};
+  x.extract();
+  XML::Internal root = XML_CAST_INTERNAL(x.get_root());
+  XML::Siblings &items = root->children["item"];
+  sb.append("items size: " + std::to_string(items.size()));
+
+  std::vector<std::string> entries{};
+  for (XML::Node node : items) {
+    XML::Internal item = XML_CAST_INTERNAL(node);
+    XML::Children::iterator it;
+
+    // Find link tag
+    if ((it = item->children.find("link")) != item->children.end()) {
+      XML::Leaf leaf = XML_CAST_LEAF(it->second[0]);
+      assert(leaf->content_idx == 0 && "content must be string");
+      std::string link = std::get<0>(leaf->content);
+      sb.append("link: " + link);
+      entries.push_back(link);
+    }
+  }
+
+  Component page = Container::Vertical({});
+  page->Add(Button("Add", action, ButtonOption::Ascii()));
+  page->Add(Menu(entries, &this->menu_idx, Page::menuStyle()));
+
+  Add(page);
+}
+
+// Element TabPage::OnRender() {}
+// bool TabPage::OnEvent(Event ev) {}
+
 // clang-format off
 void App::initialize_components() {
   log          = std::make_shared<LogMenuComponent>();
@@ -257,10 +313,12 @@ void App::initialize_components() {
   status_line  = std::make_unique<StatusLineComponent>();
   page_list    = std::make_shared<ListPage>((std::vector<std::string>){});
   page_landing = std::make_shared<LandingPage>(make_entries_from_feed());
+  page_settings= std::make_shared<TabPage>(std::vector<std::string>{"rss", "news"});
   app          = Container::Vertical({
     // pages
     Maybe(page_landing, [this] { return cur_page == DefeedCtx::Page::Landing; }),
     Maybe(page_list,    [this] { return cur_page == DefeedCtx::Page::List;    }),
+    Maybe(page_settings,[this] { return cur_page == DefeedCtx::Page::Settings;}),
 
     Renderer([] { return filler(); }),
 
@@ -285,9 +343,19 @@ std::vector<std::string> App::make_entries_from_feed() {
   std::vector<std::string> entries{};
   entries.reserve(feeds.size());
   for (int i = 0; i < feeds.size(); i++) {
-    entries.push_back(feeds[i].get()->url);
+    entries.push_back(feeds[i]->url);
   }
   return entries;
+}
+
+Component &App::getCorrectPage(DefeedCtx::Page pg) {
+  if (pg == DefeedCtx::Page::Landing)
+    return page_landing;
+  if (pg == DefeedCtx::Page::List)
+    return page_list;
+  if (pg == DefeedCtx::Page::Settings)
+    return page_settings;
+  return page_landing;
 }
 
 void App::switch_page(DefeedCtx::Page from, DefeedCtx::Page to) {
@@ -298,9 +366,9 @@ void App::switch_page(DefeedCtx::Page from, DefeedCtx::Page to) {
   assert(lpg != nullptr && "Landing page must not be nullptr");
   int selected = lpg->GetCurIndex();
   std::shared_ptr<RssFeed> feed = feeds[selected];
-  Component &target = to == DefeedCtx::Page::Landing ? page_landing : page_list;
+  Component &target = getCorrectPage(to);
 
-  if (from == DefeedCtx::Page::Landing && to == DefeedCtx::Page::List) {
+  if (to == DefeedCtx::Page::List) {
     // Creating the page for the first time
     if (feed->list_page_menu == nullptr) {
       XML::Internal root = XML_CAST_INTERNAL(feed->root);
@@ -331,7 +399,7 @@ void App::switch_page(DefeedCtx::Page from, DefeedCtx::Page to) {
     }
 
     // Walker aboba(feed.get());
-  } else if (from == DefeedCtx::Page::List && to == DefeedCtx::Page::Landing) {
+  } else if (from == DefeedCtx::Page::List) {
     // list_page_menu is populated only at alloc time, but
     // list_page_selected needs to be updated every page switch
     feed->list_page_selected = lipg->GetCurIndex();
@@ -444,6 +512,8 @@ bool CmdLine::Exec(std::string &cmd) {
     } else {
       DefeedCtx::shift_focus = true;
     }
+  } else if (cmd == "list" || cmd == "ls") {
+    DefeedCtx::page = DefeedCtx::Page::Settings;
   } else if (cmd == "q") {
     DefeedCtx::quit = true;
   } else if (cmd == "fetch") {

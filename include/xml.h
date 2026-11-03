@@ -92,6 +92,8 @@ private:
   Node make_internal(xmlNode *cur_node);
 
   void walk_root_node(NodeBase *root);
+
+  static bool shouldBeInternal(std::string &name);
 };
 
 //

@@ -39,7 +39,7 @@ struct RssFeed {
 struct DefeedCtx {
   enum class Mode { Normal, Cmd };
   enum class Task { Ready, Load, Fetch };
-  enum class Page { Landing = 0, List, Blog };
+  enum class Page { Landing = 0, List, Blog, Settings };
 
   // Move across the DefeedCtx::page hierarchy
   static void PageUp();

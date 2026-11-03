@@ -135,6 +135,10 @@ Node Extract::make_leaf(xmlNode *cur_node) {
   return std::move(leaf);
 }
 
+bool Extract::shouldBeInternal(std::string &name) {
+  return name == "item" || name == "image" || name == "channel";
+}
+
 Node Extract::make_internal(xmlNode *cur_node) {
   if (cur_node == nullptr) {
     return nullptr;
@@ -145,10 +149,13 @@ Node Extract::make_internal(xmlNode *cur_node) {
   for (node = cur_node; node; node = node->next) {
     if (node->type == XML_ELEMENT_NODE) {
       std::string name{(const char *)(node->name)};
-      Node internal_node =
-          (name == "item" || name == "image" || name == "channel")
-              ? make_internal(node->children)
-              : make_leaf(node->children);
+
+      // FIXME: Currently we hardcode internal nodes, but ideally, we should be
+      // able to look at the cur node and its children (if any) and decide if
+      // its a internal node or not
+      Node internal_node = shouldBeInternal(name)
+                               ? make_internal(node->children)
+                               : make_leaf(node->children);
       node_obj->children[name].push_back(std::move(internal_node));
     }
   }

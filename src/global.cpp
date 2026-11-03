@@ -89,7 +89,7 @@ DefeedCtx::UrlPairs DefeedCtx::get_urls() {
     return rss_urls;
   }
 
-  XML::Extract parse_xml(DefeedCtx::rss_xml);
+  XML::Extract parse_xml{DefeedCtx::rss_xml};
   parse_xml.extract();
   XML::Node root = parse_xml.get_root();
   Walker w(root.get());
@@ -198,12 +198,12 @@ SharedBuffer::SharedBuffer() {
 };
 
 std::string SharedBuffer::getString() {
-  std::unique_lock lock(mtx);
+  std::unique_lock lock{mtx};
   return std::string(buf.begin(), buf.end());
 }
 
 void SharedBuffer::append(const std::string &s) {
-  std::unique_lock lock(mtx);
+  std::unique_lock lock{mtx};
   char *data = buf.data() + buf.size();
   buf.insert(buf.end(), s.begin(), s.end());
   entries.emplace_back(std::string_view(data, s.size()));
@@ -212,12 +212,12 @@ void SharedBuffer::append(const std::string &s) {
 }
 
 const std::vector<std::string_view> &SharedBuffer::getEntries() {
-  std::unique_lock lock(mtx);
+  std::unique_lock lock{mtx};
   return this->entries;
 }
 
 const std::size_t SharedBuffer::getTotalEntries() {
-  std::unique_lock lock(mtx);
+  std::unique_lock lock{mtx};
   return this->entries.size();
 }
 

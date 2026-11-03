@@ -85,6 +85,25 @@ struct ListPage : public Page {
   void Update(Component child, int selected, int max_entries);
 };
 
+struct TabPage : public ComponentBase {
+  explicit TabPage(const std::vector<std::string> &entries);
+  // Element OnRender() override;
+  // bool OnEvent(Event ev) override;
+
+protected:
+  int menu_idx;
+  std::vector<std::string> entries;
+};
+
+struct XMLDetailPage : public ComponentBase {
+  explicit XMLDetailPage(const std::string &filename);
+  // Element OnRender() override;
+  // bool OnEvent(Event ev) override;
+protected:
+  std::string filename;
+  int menu_idx = 0;
+};
+
 class App {
   friend class CmdLine;
 
@@ -94,7 +113,7 @@ class App {
   ftxui::App screen;
   CmdLine cmd_exec_unit;
   Component log, status_line, cmd_line, app;
-  Component page_landing, page_list;
+  Component page_landing, page_list, page_settings;
   int active_page = 0;
   DefeedCtx::Page cur_page = DefeedCtx::Page::Landing;
   int cur_idx = 0;
@@ -105,6 +124,7 @@ class App {
   void initialize_components();
   void begin_fetch();
   std::vector<std::string> make_entries_from_feed();
+  Component &getCorrectPage(DefeedCtx::Page pg);
   void switch_page(DefeedCtx::Page from, DefeedCtx::Page to);
   void update_on_msg();
 

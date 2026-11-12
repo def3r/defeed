@@ -324,9 +324,9 @@ void App::switch_page() {
       lipg->UpdateEntries(s.pid);
       sb.append("Attached to existing page: " + std::to_string(s.pid));
       SWITCH_EPILOGUE(s.pid);
-    } else if (s.find("filename")) {
+    } else if (s.find("file")) {
       // NOTE: filenames must be relative to DefeedCtx::defeed
-      XML::Extract x{DefeedCtx::defeed + s.m.find("filename")->second};
+      XML::Extract x{DefeedCtx::defeed + s.m.find("file")->second};
       x.extract();
       Schemas ss;
       XML::Internal root = XML::cast_Internal(x.get_root());

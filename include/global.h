@@ -30,7 +30,7 @@ using PageID = ssize_t; // Corresponds to index in PCB
   X(YT,    "yt",         1L << 4)  \
   X(NLTR,  "newsletter", 1L << 5)  \
   X(CTGRY, "category",   1L << 6)  \
-  X(FNAME, "filename",   1L << 7)  \
+  X(FNAME, "file",       1L << 7)  \
   X(DSPLY, "display",    1L << 8)  \
   /* Others */                     \
   X(OTHER, "",           1L << 31)

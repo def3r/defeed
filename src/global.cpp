@@ -307,7 +307,7 @@ std::vector<std::string> DefeedCtx::read_toplevel() {
       assert(leaf->content_idx == 0 &&
              "top level item file content must be string");
       std::string filename = std::get<0>(leaf->content);
-      s.put("filename", filename);
+      s.put("file", filename);
     } else if (i_item->children.find("link") != i_item->children.end()) {
       leaf = XML::cast_Leaf(i_item->children["link"][0]);
       assert(leaf->content_idx == 0 &&

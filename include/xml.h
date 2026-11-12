@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cassert>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -99,15 +100,28 @@ private:
 //
 // Cast from shared_ptr<NodeBase> to
 //
-#define XML_CAST_INTERNAL(FROM_NODE)                                           \
-  std::static_pointer_cast<XML::InternalBase>(FROM_NODE)
+inline XML::Internal cast_Internal(const XML::Node &FROM_NODE) {
+  assert(FROM_NODE->type == XML::NodeType::Internal &&
+         "Invalid cast to Internal XML Node");
+  return std::static_pointer_cast<XML::InternalBase>(FROM_NODE);
+}
 
-#define XML_CAST_INTERNALBASE(FROM_NODE)                                       \
-  static_cast<XML::InternalBase *>(FROM_NODE.get())
+inline XML::InternalBase *cast_InternalBase(const XML::Node &FROM_NODE) {
+  assert(FROM_NODE->type == XML::NodeType::Internal &&
+         "Invalid cast to Internal XML Node Base");
+  return static_cast<XML::InternalBase *>(FROM_NODE.get());
+}
 
-#define XML_CAST_LEAF(FROM_NODE)                                               \
-  std::static_pointer_cast<XML::LeafBase>(FROM_NODE)
+inline XML::Leaf cast_Leaf(const XML::Node &FROM_NODE) {
+  assert(FROM_NODE->type == XML::NodeType::Leaf &&
+         "Invalid cast to Leaf XML Node");
+  return std::static_pointer_cast<XML::LeafBase>(FROM_NODE);
+}
 
-#define XML_CAST_LEAFBASE(FROM_NODE)                                           \
-  static_cast<XML::LeafBase *>(FROM_NODE.get())
+inline XML::LeafBase *cast_LeafBase(const XML::Node &FROM_NODE) {
+  assert(FROM_NODE->type == XML::NodeType::Leaf &&
+         "Invalid cast to Leaf XML Node Base");
+  return static_cast<XML::LeafBase *>(FROM_NODE.get());
+}
+
 } // namespace XML

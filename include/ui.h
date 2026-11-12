@@ -3,6 +3,7 @@
 #include <functional>
 #include <future>
 #include <memory>
+#include <stack>
 #include <string>
 
 #include <ftxui/component/app.hpp>
@@ -64,69 +65,52 @@ struct Page : public ComponentBase, public MenuOption {
   bool OnEvent(Event ev) override;
   int GetCurIndex() const;
   int GetMaxIndex() const;
+  PageID get_pid();
 
 protected:
+  PageID pid = 0;
   int selected = 0;
   int max_entries = 0;
 };
 
-struct LandingPage : public Page {
-  explicit LandingPage(const std::vector<std::string> &entries);
-  Element OnRender() override;
-  bool OnEvent(Event ev) override;
-};
-
 struct ListPage : public Page {
-  explicit ListPage(const std::vector<std::string> &entries);
+  explicit ListPage(const Schemas &ss);
+  explicit ListPage(const Schemas &ss, const std::string &entry_key);
   Element OnRender() override;
-  bool OnEvent(Event ev) override;
+  Component UpdateEntries(const PageID pid,
+                          const std::string &entry_key = "display");
+  Component UpdateEntries(const Schemas &ss,
+                          const std::string &entry_key = "display");
   Component UpdateEntries(const std::vector<std::string> &entries);
   void Update(Component child);
   void Update(Component child, int selected, int max_entries);
-};
-
-struct TabPage : public ComponentBase {
-  explicit TabPage(const std::vector<std::string> &entries);
-  // Element OnRender() override;
-  // bool OnEvent(Event ev) override;
 
 protected:
-  int menu_idx;
   std::vector<std::string> entries;
-};
-
-struct XMLDetailPage : public ComponentBase {
-  explicit XMLDetailPage(const std::string &filename);
-  // Element OnRender() override;
-  // bool OnEvent(Event ev) override;
-protected:
-  std::string filename;
-  int menu_idx = 0;
 };
 
 class App {
   friend class CmdLine;
 
   std::future<std::vector<std::shared_ptr<RssFeed>>> f;
-  std::vector<std::shared_ptr<RssFeed>> feeds;
 
   ftxui::App screen;
   CmdLine cmd_exec_unit;
   Component log, status_line, cmd_line, app;
-  Component page_landing, page_list, page_settings;
+  Component page_landing, page_list;
   int active_page = 0;
-  DefeedCtx::Page cur_page = DefeedCtx::Page::Landing;
   int cur_idx = 0;
 
   bool OnEvent(Event ev);
   std::function<bool(Event)> on_event;
 
-  void initialize_components();
   void begin_fetch();
-  std::vector<std::string> make_entries_from_feed();
-  Component &getCorrectPage(DefeedCtx::Page pg);
-  void switch_page(DefeedCtx::Page from, DefeedCtx::Page to);
-  void update_on_msg();
+  void switch_page();
+  void update_on_event();
+
+  // Page impl
+  PageID active_pid = 0;
+  std::stack<PageID> call_history{}, call_history_back{};
 
 public:
   App();

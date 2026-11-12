@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<defeed>
+  <category>news</category>
+  <item>
+    <display>Newslaundry</display>
+    <link>https://www.newslaundry.com/</link>
+    <rss>https://www.newslaundry.com/stories.rss?time-period=last-7-days&amp;exclude-section-ids=15848,15817</rss>
+    <yt>https://www.youtube.com/user/newslaundry</yt>
+    <newsletter>https://www.newslaundry.com/newsletter-signup</newsletter>
+  </item>
+</defeed>

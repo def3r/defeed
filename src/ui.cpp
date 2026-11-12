@@ -16,6 +16,8 @@
 #include <ftxui/screen/screen.hpp>
 #include <ftxui/screen/terminal.hpp>
 
+#include <unistd.h>
+
 using namespace std::chrono_literals;
 
 namespace UI {
@@ -99,6 +101,11 @@ bool LogMenuComponent::OnEvent(Event ev) {
     return true;
   }
 
+  if (ev == Event::CtrlK) {
+    DefeedCtx::shift_focus = true;
+    return true;
+  }
+
   return ComponentBase::OnEvent(ev);
 }
 MenuOption LogMenuComponent::menuStyle() {
@@ -156,6 +163,7 @@ bool CmdLineComponent::OnEvent(Event ev) {
 
   if (ev == Event::Escape) {
     DefeedCtx::mode = DefeedCtx::Mode::Normal;
+    DefeedCtx::shift_focus = true;
     return true;
   }
 
@@ -190,45 +198,72 @@ bool Page::OnEvent(Event ev) {
     return true;
   }
 
+  // TODO: Switch Request
   if (ev == Event::Escape || ev == Event::Character('-')) {
-    DefeedCtx::PageUp();
+    DefeedCtx::switch_request = true;
+    DefeedCtx::switch_type = DefeedCtx::SwitchPage::Backwards;
     return true;
   }
 
   if (ev == Event::Return) {
-    DefeedCtx::PageDown();
+    DefeedCtx::switch_request = true;
+    DefeedCtx::switch_type = DefeedCtx::SwitchPage::Forward;
+    return true;
+  }
+
+  if (ev == Event::Character('+')) {
+    DefeedCtx::switch_request = true;
+    DefeedCtx::switch_type = DefeedCtx::SwitchPage::UndoBackwards;
     return true;
   }
 
   return ComponentBase::OnEvent(ev);
 }
+PageID Page::get_pid() { return this->pid; }
 
-LandingPage::LandingPage(const std::vector<std::string> &entries) {
-  selected = 0;
-  max_entries = entries.size();
-  Component pg = Menu(entries, &this->selected, Page::menuStyle());
-  Add(pg);
+ListPage::ListPage(const Schemas &ss) {
+  pid = PCB::create(ss);
+  if (pid == 0) {
+    PageCtx &pcx = PCB::getRefTo(pid);
+    pcx.entry_key = "display";
+    pcx.entries = Schema::getAll(ss, pcx.entry_key);
+    sb.append("PCX Entries: " + std::to_string(pcx.entries.size()));
+    UpdateEntries(pcx.entries);
+  } else {
+    assert(0 && "TBD");
+  }
 }
-Element LandingPage::OnRender() {
-  // clang-format off
-  Element home = vbox({
-    text("Home screen"),
-    separator(),
-    Render(),
-  }) | flex;
-  // clang-format on
-  return home;
-}
-bool LandingPage::OnEvent(Event ev) { return Page::OnEvent(ev); }
-
-ListPage::ListPage(const std::vector<std::string> &entries) {
-  UpdateEntries(entries);
-}
+ListPage::ListPage(const Schemas &ss, const std::string &entry_key) {}
 Element ListPage::OnRender() {
   Dimensions dims = ftxui::Terminal::Size();
   int pg_size = dims.dimy - (DefeedCtx::show_logs ? 11 : 2);
   return Render() | vscroll_indicator | yframe |
          size(ftxui::HEIGHT, ftxui::LESS_THAN, pg_size);
+}
+Component ListPage::UpdateEntries(const PageID pid,
+                                  const std::string &entry_key) {
+  this->pid = pid;
+  PageCtx &pcx = PCB::getRefTo(pid);
+  if (pcx.ss.size() == 0) {
+    // NOTE: Try for XML::Node; in which case the pcx.entries is already
+    // populated (assumption)
+  } else {
+    pcx.entry_key = entry_key;
+    pcx.entries = Schema::getAll(pcx.ss, pcx.entry_key);
+  }
+  sb.append("PCX Entries: " + std::to_string(pcx.entries.size()));
+  Component pg = Menu(pcx.entries, &selected, Page::menuStyle());
+  Update(pg, pcx.selected, pcx.entries.size());
+  return pg;
+}
+Component ListPage::UpdateEntries(const Schemas &ss,
+                                  const std::string &entry_key) {
+  pid = PCB::create(ss);
+  PageCtx &pcx = PCB::getRefTo(pid);
+  pcx.entry_key = entry_key;
+  pcx.entries = Schema::getAll(ss, pcx.entry_key);
+  sb.append("PCX Entries: " + std::to_string(pcx.entries.size()));
+  return UpdateEntries(pcx.entries);
 }
 Component ListPage::UpdateEntries(const std::vector<std::string> &entries) {
   selected = 0;
@@ -248,89 +283,6 @@ void ListPage::Update(Component child, int selected, int max_entries) {
   DetachAllChildren();
   Add(std::move(child));
 }
-bool ListPage::OnEvent(Event ev) { return Page::OnEvent(ev); }
-
-TabPage::TabPage(const std::vector<std::string> &entries) {
-  this->entries = entries;
-  menu_idx = 0;
-
-  Component xmldetail = std::make_shared<XMLDetailPage>(DefeedCtx::rss_xml);
-  Component menu = Menu(&this->entries, &menu_idx);
-  Component tab = Container::Tab({xmldetail}, &menu_idx);
-  Component tab_hori = Container::Horizontal({menu, tab});
-  Add(tab_hori);
-}
-
-XMLDetailPage::XMLDetailPage(const std::string &filename) {
-  this->filename = filename;
-  auto action = [&] { sb.append("Clicked"); };
-
-  // TODO: Add a way for XML::Extract to do this
-  std::ifstream fs{filename};
-  if (!fs.is_open()) {
-    sb.append("[XMLDetailPage ctor]: Unable to open file: " + filename);
-    Add(Renderer(
-        [] { return text("[XMLDetailPage ctor]: Unable to open file"); }));
-    return;
-  }
-  fs.close();
-
-  XML::Extract x{filename};
-  x.extract();
-  XML::Internal root = XML_CAST_INTERNAL(x.get_root());
-  XML::Siblings &items = root->children["item"];
-  sb.append("items size: " + std::to_string(items.size()));
-
-  std::vector<std::string> entries{};
-  for (XML::Node node : items) {
-    XML::Internal item = XML_CAST_INTERNAL(node);
-    XML::Children::iterator it;
-
-    // Find link tag
-    if ((it = item->children.find("link")) != item->children.end()) {
-      XML::Leaf leaf = XML_CAST_LEAF(it->second[0]);
-      assert(leaf->content_idx == 0 && "content must be string");
-      std::string link = std::get<0>(leaf->content);
-      sb.append("link: " + link);
-      entries.push_back(link);
-    }
-  }
-
-  Component page = Container::Vertical({});
-  page->Add(Button("Add", action, ButtonOption::Ascii()));
-  page->Add(Menu(entries, &this->menu_idx, Page::menuStyle()));
-
-  Add(page);
-}
-
-// Element TabPage::OnRender() {}
-// bool TabPage::OnEvent(Event ev) {}
-
-// clang-format off
-void App::initialize_components() {
-  log          = std::make_shared<LogMenuComponent>();
-  cmd_line     = std::make_shared<CmdLineComponent>(&cmd_exec_unit);
-  status_line  = std::make_unique<StatusLineComponent>();
-  page_list    = std::make_shared<ListPage>((std::vector<std::string>){});
-  page_landing = std::make_shared<LandingPage>(make_entries_from_feed());
-  page_settings= std::make_shared<TabPage>(std::vector<std::string>{"rss", "news"});
-  app          = Container::Vertical({
-    // pages
-    Maybe(page_landing, [this] { return cur_page == DefeedCtx::Page::Landing; }),
-    Maybe(page_list,    [this] { return cur_page == DefeedCtx::Page::List;    }),
-    Maybe(page_settings,[this] { return cur_page == DefeedCtx::Page::Settings;}),
-
-    Renderer([] { return filler(); }),
-
-    status_line,
-    Maybe(log, &DefeedCtx::show_logs)
-      | size(ftxui::HEIGHT, ftxui::LESS_THAN, 10),
-    Maybe(cmd_line, [] { return DefeedCtx::mode == DefeedCtx::Mode::Cmd; })
-      | size(ftxui::HEIGHT, ftxui::EQUAL,     1),
-  }, &active_page)
-    | CatchEvent(on_event);
-}
-// clang-format on
 
 void App::begin_fetch() {
   if (DefeedCtx::task != DefeedCtx::Task::Fetch) {
@@ -339,47 +291,78 @@ void App::begin_fetch() {
   }
 }
 
-std::vector<std::string> App::make_entries_from_feed() {
-  std::vector<std::string> entries{};
-  entries.reserve(feeds.size());
-  for (int i = 0; i < feeds.size(); i++) {
-    entries.push_back(feeds[i]->url);
-  }
-  return entries;
-}
-
-Component &App::getCorrectPage(DefeedCtx::Page pg) {
-  if (pg == DefeedCtx::Page::Landing)
-    return page_landing;
-  if (pg == DefeedCtx::Page::List)
-    return page_list;
-  if (pg == DefeedCtx::Page::Settings)
-    return page_settings;
-  return page_landing;
-}
-
-void App::switch_page(DefeedCtx::Page from, DefeedCtx::Page to) {
-  std::shared_ptr<LandingPage> lpg =
-      std::static_pointer_cast<LandingPage>(page_landing);
+void App::switch_page() {
   std::shared_ptr<ListPage> lipg =
       std::static_pointer_cast<ListPage>(page_list);
-  assert(lpg != nullptr && "Landing page must not be nullptr");
-  int selected = lpg->GetCurIndex();
-  std::shared_ptr<RssFeed> feed = feeds[selected];
-  Component &target = getCorrectPage(to);
+  int selected = lipg->GetCurIndex();
+  PageCtx &ctx = PCB::getRefTo(active_pid);
+  ctx.selected = selected;
 
-  if (to == DefeedCtx::Page::List) {
-    // Creating the page for the first time
-    if (feed->list_page_menu == nullptr) {
-      XML::Internal root = XML_CAST_INTERNAL(feed->root);
+#define SWITCH_EPILOGUE(new_active_pid)                                        \
+  do {                                                                         \
+    if (new_active_pid != active_pid) {                                        \
+      if (!call_history_back.empty()) {                                        \
+        if (active_pid == call_history_back.top()) {                           \
+          call_history_back.pop();                                             \
+        } else {                                                               \
+          call_history_back = {};                                              \
+        }                                                                      \
+      }                                                                        \
+      call_history.push(active_pid);                                           \
+      const PageID _new_active_pid = new_active_pid;                           \
+      active_pid = *&_new_active_pid;                                          \
+      s.pid = active_pid;                                                      \
+    }                                                                          \
+    DefeedCtx::switch_request = false;                                         \
+  } while (0)
+
+  if (DefeedCtx::switch_type == DefeedCtx::SwitchPage::Forward) {
+    // FIXME: if active_pid doesnt have schema (instead it has xml root), this
+    // crashes
+    Schema &s = PCB::getSchemaAt(active_pid, selected);
+    if (s.hasPage()) {
+      lipg->UpdateEntries(s.pid);
+      sb.append("Attached to existing page: " + std::to_string(s.pid));
+      SWITCH_EPILOGUE(s.pid);
+    } else if (s.find("filename")) {
+      // NOTE: filenames must be relative to DefeedCtx::defeed
+      XML::Extract x{DefeedCtx::defeed + s.m.find("filename")->second};
+      x.extract();
+      Schemas ss;
+      XML::Internal root = XML::cast_Internal(x.get_root());
+      XML::Siblings &items = root->children["item"];
+      for (XML::Node &item : items) {
+        Schema s_child{};
+        assert(item->type == XML::NodeType::Internal &&
+               "Nested Internal nodes not supported yet!");
+        XML::Internal internal = XML::cast_Internal(item);
+        for (auto &[key, sibs] : internal->children) {
+          assert(sibs.size() <= 1 && "Probable duplicate tags");
+          XML::Leaf leaf = XML::cast_Leaf(sibs[0]);
+          assert(leaf->content_idx == 0 && "Expected string content, got HTML");
+          std::string val = std::get<0>(leaf->content);
+          s_child.put(key, val);
+        }
+        ss.push_back(std::move(s_child));
+      }
+      sb.append("Schema fetched!");
+      lipg->UpdateEntries(ss);
+      SWITCH_EPILOGUE(lipg->get_pid());
+
+    } else if (s.find("rss")) {
+      // NOTE: Special case, we dont create Schema objects for xml that is not
+      // used to define Defeed's behaviour. We also do not know what type of
+      // layout will the rss xml have. The best we can do is guess!
+      XML::Node rss = DefeedCtx::loadRSS(s.m["rss"]);
+      XML::Internal root = XML::cast_Internal(rss);
       XML::Siblings &items =
-          (XML_CAST_INTERNALBASE(root->children["channel"][0]))
+          (XML::cast_InternalBase(root->children["channel"][0]))
               ->children["item"];
 
       std::vector<std::string> entries{};
       for (int i = 0; i < items.size(); i++) {
-        XML::LeafBase *title = XML_CAST_LEAFBASE(
-            XML_CAST_INTERNALBASE(items[i])->children["title"][0]);
+        XML::LeafBase *title = XML::cast_LeafBase(
+            XML::cast_InternalBase(items[i])->children["title"][0]);
         if (title == nullptr) {
           sb.append("[PAGE] Title is nullptr");
           continue;
@@ -390,35 +373,58 @@ void App::switch_page(DefeedCtx::Page from, DefeedCtx::Page to) {
         }
         entries.push_back(std::get<0>(title->content));
       }
-      feed->list_page_menu = lipg->UpdateEntries(entries);
-      feed->list_page_max_entries = entries.size();
+      PageID new_pg = PCB::create(rss, "title", entries);
+      lipg->UpdateEntries(new_pg, "title");
+      SWITCH_EPILOGUE(new_pg);
 
-    } else {
-      lipg->Update(feed->list_page_menu, feed->list_page_selected,
-                   feed->list_page_max_entries);
+    } else if (s.find("link")) {
+      //  chromium --app=link
+      const std::string link{"--app=" + s.m["link"]};
+      sb.append("Launching chromium");
+      pid_t child = fork();
+      if (child == 0) {
+        execlp("chromium", "chromium", link.c_str(), nullptr);
+      } else if (child < 0) {
+        sb.append("Failed to fork");
+      }
+      sb.append("Launched Chromium");
+      SWITCH_EPILOGUE(active_pid); // nop on switching page
     }
 
-    // Walker aboba(feed.get());
-  } else if (from == DefeedCtx::Page::List) {
-    // list_page_menu is populated only at alloc time, but
-    // list_page_selected needs to be updated every page switch
-    feed->list_page_selected = lipg->GetCurIndex();
+  } else if (DefeedCtx::switch_type == DefeedCtx::SwitchPage::Backwards) {
+    if (!call_history.empty()) {
+      PageID pid = call_history.top();
+      lipg->UpdateEntries(pid);
+      call_history_back.push(active_pid);
+      active_pid = pid;
+      call_history.pop();
+      DefeedCtx::switch_request = false;
+    }
+
+  } else if (DefeedCtx::switch_type == DefeedCtx::SwitchPage::UndoBackwards) {
+    if (!call_history_back.empty()) {
+      PageID pid = call_history_back.top();
+      lipg->UpdateEntries(pid);
+      call_history.push(active_pid);
+      active_pid = pid;
+      call_history_back.pop();
+      DefeedCtx::switch_request = false;
+    }
   }
 
-  target->TakeFocus();
-  cur_page = to;
+#undef SWITCH_EPILOGUE
 }
 
-void App::update_on_msg() {
+void App::update_on_event() {
   if (DefeedCtx::shift_focus) {
-    active_page = static_cast<int>(DefeedCtx::page);
+    active_page = 0;
     app->TakeFocus();
     DefeedCtx::shift_focus = false;
   }
 }
 
 bool App::OnEvent(Event ev) {
-  update_on_msg();
+  update_on_event();
 
   if (DefeedCtx::mode != DefeedCtx::Mode::Normal)
     return false;
@@ -456,15 +462,41 @@ bool App::OnEvent(Event ev) {
     return true;
   }
 
+  // NOTE: CtrlJ corresponds to "Return" in terminal
+  // CtrlJ -> Line Feed
+  // CtrlM -> Carriage Return
+  if (ev == Event::CtrlL && DefeedCtx::show_logs) {
+    log->TakeFocus();
+    return true;
+  }
+
   return false;
 }
 
 App::App()
     : screen(ftxui::App::Fullscreen()), cmd_exec_unit(this),
       on_event([this](Event ev) { return OnEvent(ev); }) {
-  // TODO: set DefeedCtx::task to Task::Load when we move to async
-  feeds = DefeedCtx::loadRSS();
-  initialize_components();
+  DefeedCtx::read_toplevel();
+
+  // clang-format off
+  log          = std::make_shared<LogMenuComponent>();
+  cmd_line     = std::make_shared<CmdLineComponent>(&cmd_exec_unit);
+  status_line  = std::make_unique<StatusLineComponent>();
+  page_list    = std::make_shared<ListPage>(DefeedCtx::toplevel);
+  app          = Container::Vertical({
+    // Maybe(page_list,    [this] { return /* cur_page == DefeedCtx::Page::List */ true;    }),
+    page_list,
+
+    Renderer([] { return filler(); }),
+
+    status_line,
+    Maybe(log, &DefeedCtx::show_logs)
+      | size(ftxui::HEIGHT, ftxui::LESS_THAN, 10),
+    Maybe(cmd_line, [] { return DefeedCtx::mode == DefeedCtx::Mode::Cmd; })
+      | size(ftxui::HEIGHT, ftxui::EQUAL,     1),
+  }, &active_page)
+    | CatchEvent(on_event);
+  // clang-format on
 }
 
 void App::EventLoop() {
@@ -486,8 +518,8 @@ void App::EventLoop() {
       };
     }
 
-    if (cur_page != DefeedCtx::page) {
-      switch_page(cur_page, DefeedCtx::page);
+    if (DefeedCtx::switch_request) {
+      switch_page();
     }
 
     screen.RequestAnimationFrame();
@@ -513,7 +545,7 @@ bool CmdLine::Exec(std::string &cmd) {
       DefeedCtx::shift_focus = true;
     }
   } else if (cmd == "list" || cmd == "ls") {
-    DefeedCtx::page = DefeedCtx::Page::Settings;
+    // nop
   } else if (cmd == "q") {
     DefeedCtx::quit = true;
   } else if (cmd == "fetch") {

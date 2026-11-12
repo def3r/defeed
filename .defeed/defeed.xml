@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<defeed>
+  <category>defeedtoplevel</category>
+  <item>
+    <display>rss</display>
+    <file>rss.xml</file>
+  </item>
+  <item>
+    <display>news</display>
+    <file>news.xml</file>
+  </item>
+  <item>
+    <display>insta dm</display>
+    <link>https://www.instagram.com/direct/inbox/</link>
+  </item>
+</defeed>

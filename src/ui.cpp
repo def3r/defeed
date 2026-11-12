@@ -300,7 +300,8 @@ void App::switch_page() {
 
 #define SWITCH_EPILOGUE(new_active_pid)                                        \
   do {                                                                         \
-    if (new_active_pid != active_pid) {                                        \
+    const PageID _new_active_pid = new_active_pid;                             \
+    if (_new_active_pid != active_pid) {                                       \
       if (!call_history_back.empty()) {                                        \
         if (active_pid == call_history_back.top()) {                           \
           call_history_back.pop();                                             \
@@ -309,7 +310,6 @@ void App::switch_page() {
         }                                                                      \
       }                                                                        \
       call_history.push(active_pid);                                           \
-      const PageID _new_active_pid = new_active_pid;                           \
       active_pid = *&_new_active_pid;                                          \
       s.pid = active_pid;                                                      \
     }                                                                          \

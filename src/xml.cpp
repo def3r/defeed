@@ -74,7 +74,6 @@ Extract &Extract::operator=(Extract &&other) {
 // Called  function allocates
 void Extract::extract() {
   root_node = make_internal(root->children);
-  sb.append("Extracted!");
 }
 
 void Extract::walk() {

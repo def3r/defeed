@@ -227,7 +227,6 @@ ListPage::ListPage(const Schemas &ss) {
     PageCtx &pcx = PCB::getRefTo(pid);
     pcx.entry_key = "display";
     pcx.entries = Schema::getAll(ss, pcx.entry_key);
-    sb.append("PCX Entries: " + std::to_string(pcx.entries.size()));
     UpdateEntries(pcx.entries);
   } else {
     assert(0 && "TBD");
@@ -251,7 +250,6 @@ Component ListPage::UpdateEntries(const PageID pid,
     pcx.entry_key = entry_key;
     pcx.entries = Schema::getAll(pcx.ss, pcx.entry_key);
   }
-  sb.append("PCX Entries: " + std::to_string(pcx.entries.size()));
   Component pg = Menu(pcx.entries, &selected, Page::menuStyle());
   Update(pg, pcx.selected, pcx.entries.size());
   return pg;
@@ -345,7 +343,7 @@ void App::switch_page() {
         }
         ss.push_back(std::move(s_child));
       }
-      sb.append("Schema fetched!");
+      sb.append("Schema fetched for " + s.m["file"]);
       lipg->UpdateEntries(ss);
       SWITCH_EPILOGUE(lipg->get_pid());
 
@@ -380,14 +378,13 @@ void App::switch_page() {
     } else if (s.find("link")) {
       //  chromium --app=link
       const std::string link{"--app=" + s.m["link"]};
-      sb.append("Launching chromium");
+      sb.append("Launching Chromium: " + link);
       pid_t child = fork();
       if (child == 0) {
         execlp("chromium", "chromium", link.c_str(), nullptr);
       } else if (child < 0) {
         sb.append("Failed to fork");
       }
-      sb.append("Launched Chromium");
       SWITCH_EPILOGUE(active_pid); // nop on switching page
     }
 

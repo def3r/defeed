@@ -1,7 +1,9 @@
 defeed
 
 Feed your head with what you want, and not the garbage that algorithm wants you
-to consume to keep you addicted.
+to consume to keep you addicted
+
+because you are the product [https://www.cbsnews.com/news/facebook-addictive-as-cigarettes-former-executive-says/]
 
 ---
 

@@ -23,11 +23,11 @@ public:
   void apply_headers();
 
 private:
-  CURL *curl;
-  CURLcode res;
-  std::string url, etag;
-  size_t url_hash;
-  struct curl_slist *headers;
+  CURL *curl = nullptr;
+  CURLcode res = CURLE_OK;
+  std::string url{}, etag{};
+  size_t url_hash = 0;
+  struct curl_slist *headers = nullptr;
 
   static size_t write_cb(char *ptr, size_t size, size_t nmemb, void *stream);
   static size_t header_callback(char *buffer, size_t size, size_t nitems,
@@ -50,8 +50,8 @@ public:
   void update_fetcher_headers();
 
 private:
-  CURLM *multi;
-  std::vector<Fetcher> fetchers;
-  std::vector<size_t> hash;
-  struct curl_slist *headers = NULL;
+  CURLM *multi = nullptr;
+  std::vector<Fetcher> fetchers{};
+  std::vector<size_t> hash{};
+  struct curl_slist *headers = nullptr;
 };

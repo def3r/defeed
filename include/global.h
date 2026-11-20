@@ -12,6 +12,8 @@
 
 #include "xml.h"
 
+#define UNUSED
+
 struct CurlGlobal {
   static void init();
   static void cleanup();
@@ -43,8 +45,8 @@ using Schemas = std::vector<Schema>;
 struct Schema {
   using SchemaField = size_t;
 
-  PageID pid = -1;     // Is a page assoc with the cur schema, if not -1
-  bool linked = false; // If a link assoc with the cur schema is open
+  PageID pid = -1;            // Is a page assoc with the cur schema, if not -1
+  UNUSED bool linked = false; // If a link assoc with the cur schema is open
   SchemaField fields = 0;
   std::unordered_map<std::string, std::string> m;
 
@@ -108,13 +110,13 @@ struct PCB {
 
 // FIXME: Get rid of ts
 struct RssFeed {
-  std::string url;
-  std::size_t hash;
+  std::string url{};
+  std::size_t hash{};
 
-  std::string author;
-  std::string last_updated;
+  std::string author{};
+  std::string last_updated{};
 
-  std::shared_ptr<XML::NodeBase> root;
+  std::shared_ptr<XML::NodeBase> root{};
 
   int list_page_selected = 0;
   int list_page_max_entries = 0;
@@ -125,7 +127,7 @@ struct RssFeed {
 //
 // (UI also uses this global state insteading of "owning" it)
 struct DefeedCtx {
-  enum class Mode { Normal, Cmd };
+  enum class Mode { Normal, Cmd, Search };
   enum class Task { Ready, Load, Fetch };
   enum class SwitchPage { Backwards, Forward, UndoBackwards };
 
@@ -175,10 +177,10 @@ public:
   }
 
 private:
-  std::mutex mtx;
-  std::vector<char> buf;
-  std::vector<std::string_view> entries;
-  std::fstream lfile;
+  std::mutex mtx{};
+  std::vector<char> buf{};
+  std::vector<std::string_view> entries{};
+  std::fstream lfile{};
 
   void lock();
   void unlock();
@@ -186,8 +188,8 @@ private:
 
 struct Walker {
   std::string filename = "walker.txt";
-  std::fstream fs;
-  XML::NodeBase *root;
+  std::fstream fs{};
+  XML::NodeBase *root = nullptr;
   Walker(RssFeed *_Nonnull feed) : root(feed->root.get()) {
     fs.open(filename, std::ios::out);
     fs << "[ROOT]\n";
@@ -237,5 +239,8 @@ struct Walker {
     }
   }
 };
+
+// impl from cppreference
+std::string str_tolower(std::string s);
 
 extern SharedBuffer sb;

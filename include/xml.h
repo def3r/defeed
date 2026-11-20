@@ -19,8 +19,8 @@ enum class NodeType { Internal, Leaf };
 using Attributes = std::unordered_map<std::string, std::string>;
 
 struct NodeBase {
-  NodeType type;
-  Attributes attrs;
+  NodeType type = NodeType::Internal;
+  Attributes attrs{};
 };
 
 // clang-format off
@@ -30,7 +30,7 @@ using Children = std::unordered_map<std::string, Siblings>;
 // clang-format on
 
 struct InternalBase : public NodeBase {
-  Children children;
+  Children children{};
 
   InternalBase();
 
@@ -39,8 +39,8 @@ struct InternalBase : public NodeBase {
 using Internal = std::shared_ptr<InternalBase>;
 
 struct LeafBase : public NodeBase {
-  std::variant<std::string, HTML::Node> content;
-  int content_idx;
+  std::variant<std::string, HTML::Node> content{};
+  int content_idx = 0;
 
   LeafBase();
 };
@@ -84,10 +84,10 @@ public:
   void walk();
 
 private:
-  std::string xml_file;
-  xmlDoc *doc;
-  xmlNode *root;
-  Node root_node;
+  std::string xml_file{};
+  xmlDoc *doc = nullptr;
+  xmlNode *root = nullptr;
+  Node root_node{};
 
   Node make_leaf(xmlNode *cur_node);
   Node make_internal(xmlNode *cur_node);

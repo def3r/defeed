@@ -6,6 +6,7 @@
 #include <future>
 #include <iostream>
 #include <memory>
+#include <string>
 #include <thread>
 
 #include <ftxui/component/app.hpp>
@@ -126,6 +127,7 @@ StatusLineComponent::StatusLineComponent() {
 }
 Element StatusLineComponent::OnRender() {
   static std::string status;
+  static Color c = Color::Blue;
   // clang-format off
   if (DefeedCtx::mode == DefeedCtx::Mode::Normal) {
     switch (DefeedCtx::task) {
@@ -133,7 +135,16 @@ Element StatusLineComponent::OnRender() {
       case DefeedCtx::Task::Fetch: status = "Fetching"; break;
       case DefeedCtx::Task::Load:  status = "Loading"; break;
     }
-  } else status = "Cmd";
+  } else if (DefeedCtx::mode == DefeedCtx::Mode::Cmd) {
+    status = "Cmd";
+  } else if (DefeedCtx::mode == DefeedCtx::Mode::Search) {
+    status = "Search";
+    c = Color::Green;
+  }
+
+  if (DefeedCtx::mode != DefeedCtx::Mode::Search) {
+    c = Color::Blue;
+  }
 
   return hbox({
     text(" "),
@@ -141,7 +152,7 @@ Element StatusLineComponent::OnRender() {
     text(" "),
     Render(),
     filler() | yflex,
-  }) | bgcolor(Color::Blue)
+  }) | bgcolor(c)
      | color(Color::White);
   // clang-format on
 }
@@ -158,7 +169,8 @@ CmdLineComponent::CmdLineComponent(CmdLine *_Nonnull clunit) : clunit(clunit) {
 bool CmdLineComponent::Focusable() const { return true; }
 Element CmdLineComponent::OnRender() { return Render(); }
 bool CmdLineComponent::OnEvent(Event ev) {
-  if (DefeedCtx::mode != DefeedCtx::Mode::Cmd)
+  if (DefeedCtx::mode != DefeedCtx::Mode::Cmd &&
+      DefeedCtx::mode != DefeedCtx::Mode::Search)
     return false;
 
   if (ev == Event::Escape) {
@@ -167,11 +179,17 @@ bool CmdLineComponent::OnEvent(Event ev) {
     return true;
   }
 
-  if (ev == Event::Return) {
+  if (ev == Event::Return && DefeedCtx::mode == DefeedCtx::Mode::Cmd) {
     DefeedCtx::mode = DefeedCtx::Mode::Normal;
     if (this->clunit->Exec(cmd)) {
       cmd = "";
     }
+    return true;
+  }
+
+  if (DefeedCtx::mode == DefeedCtx::Mode::Search) {
+    ComponentBase::OnEvent(ev);
+    this->clunit->Search(cmd);
     return true;
   }
 
@@ -289,6 +307,17 @@ void App::begin_fetch() {
   }
 }
 
+void App::switch_page(PageID pid) {
+  if (pid == -1 || active_pid == pid)
+    return;
+
+  std::shared_ptr<ListPage> lipg =
+      std::static_pointer_cast<ListPage>(page_list);
+  active_pid = pid;
+  lipg->UpdateEntries(pid);
+  sb.append("Attached to existing page: " + std::to_string(pid));
+}
+
 void App::switch_page() {
   std::shared_ptr<ListPage> lipg =
       std::static_pointer_cast<ListPage>(page_list);
@@ -322,6 +351,7 @@ void App::switch_page() {
       lipg->UpdateEntries(s.pid);
       sb.append("Attached to existing page: " + std::to_string(s.pid));
       SWITCH_EPILOGUE(s.pid);
+
     } else if (s.find("file")) {
       // NOTE: filenames must be relative to DefeedCtx::defeed
       XML::Extract x{DefeedCtx::defeed + s.m.find("file")->second};
@@ -459,6 +489,16 @@ bool App::OnEvent(Event ev) {
     return true;
   }
 
+  if (ev == Event::Character('/')) {
+    DefeedCtx::mode = DefeedCtx::Mode::Search;
+    // NOTE: We must inform the clunit about the PageID on which we want to call
+    // the recursive search from, because the cureent pid will be replaced with
+    // a temp Search Result list page
+    cmd_exec_unit.set_search_pid(active_pid);
+    cmd_line->TakeFocus();
+    return true;
+  }
+
   // NOTE: CtrlJ corresponds to "Return" in terminal
   // CtrlJ -> Line Feed
   // CtrlM -> Carriage Return
@@ -489,7 +529,8 @@ App::App()
     status_line,
     Maybe(log, &DefeedCtx::show_logs)
       | size(ftxui::HEIGHT, ftxui::LESS_THAN, 10),
-    Maybe(cmd_line, [] { return DefeedCtx::mode == DefeedCtx::Mode::Cmd; })
+    Maybe(cmd_line, [] { return DefeedCtx::mode == DefeedCtx::Mode::Cmd ||
+                                DefeedCtx::mode == DefeedCtx::Mode::Search; })
       | size(ftxui::HEIGHT, ftxui::EQUAL,     1),
   }, &active_page)
     | CatchEvent(on_event);
@@ -554,8 +595,52 @@ bool CmdLine::Exec(std::string &cmd) {
   return retval;
 }
 
-CmdLine::CmdLine(UI::App *parent) : parent(parent) {
+CmdLine::CmdLine(UI::App *_Nonnull parent) : parent(parent) {
   assert(parent && "CmdLine cannot have nullptr for parent");
+}
+
+void CmdLine::set_search_pid(const PageID pid) {
+  sb.append("Updated pid");
+  this->search_pid = pid;
+}
+
+Schemas CmdLine::Search(const std::string &needle) {
+  assert(search_pid != -1 && "Must set search pid before using Search method");
+
+  if (needle.empty()) {
+    parent->switch_page(search_pid);
+    sb.append("Restored Page " + std::to_string(search_pid));
+    return {};
+  }
+
+  PageCtx &pcx = PCB::getRefTo(search_pid);
+  std::string l_needle = needle;
+  l_needle = str_tolower(l_needle);
+
+  Schemas ss{};
+  if (pcx.ss.size()) {
+    for (Schema &s : pcx.ss) {
+      if (s.find("display")) {
+        std::string display = s.m["display"];
+        display = str_tolower(display);
+        if (display.find(l_needle) != std::string::npos) {
+          sb.append(display + " found for " + l_needle);
+          ss.push_back(s);
+        }
+      }
+
+      if (!s.hasPage()) {
+      }
+    }
+  }
+
+  std::shared_ptr<ListPage> lipg =
+      std::static_pointer_cast<ListPage>(parent->page_list);
+  lipg->UpdateEntries(ss);
+  parent->active_pid = lipg->get_pid();
+  sb.append("Updated Entries for " + l_needle);
+
+  return ss;
 }
 
 } // namespace UI

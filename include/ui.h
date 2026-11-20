@@ -22,9 +22,13 @@ class App;
 struct CmdLine {
   CmdLine(UI::App *parent);
   bool Exec(std::string &cmd);
+  Schemas Search(const std::string &needle);
+
+  void set_search_pid(const PageID pid);
 
 private:
   UI::App *parent = nullptr;
+  PageID search_pid = -1;
 };
 
 struct LoadingComponent : public ComponentBase {
@@ -40,7 +44,7 @@ struct LogMenuComponent : public ComponentBase {
 
 private:
   int log_menu_idx = 0;
-  std::vector<std::string_view> entries;
+  std::vector<std::string_view> entries{};
 };
 
 struct StatusLineComponent : public ComponentBase {
@@ -55,8 +59,8 @@ struct CmdLineComponent : public ComponentBase {
   bool OnEvent(Event ev) override;
 
 private:
-  std::string cmd;
-  CmdLine *clunit;
+  std::string cmd{};
+  CmdLine *clunit = nullptr;
 };
 
 struct Page : public ComponentBase, public MenuOption {
@@ -86,18 +90,18 @@ struct ListPage : public Page {
   void Update(Component child, int selected, int max_entries);
 
 protected:
-  std::vector<std::string> entries;
+  std::vector<std::string> entries{};
 };
 
 class App {
   friend class CmdLine;
 
-  std::future<std::vector<std::shared_ptr<RssFeed>>> f;
+  std::future<std::vector<std::shared_ptr<RssFeed>>> f{};
 
   ftxui::App screen;
   CmdLine cmd_exec_unit;
-  Component log, status_line, cmd_line, app;
-  Component page_landing, page_list;
+  Component log{}, status_line{}, cmd_line{}, app{};
+  Component page_landing{}, page_list{};
   int active_page = 0;
   int cur_idx = 0;
 
@@ -106,6 +110,7 @@ class App {
 
   void begin_fetch();
   void switch_page();
+  void switch_page(PageID pid);
   void update_on_event();
 
   // Page impl

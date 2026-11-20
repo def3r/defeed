@@ -490,7 +490,8 @@ bool App::OnEvent(Event ev) {
     // NOTE: We must inform the clunit about the PageID on which we want to call
     // the recursive search from, because the cureent pid will be replaced with
     // a temp Search Result list page
-    cmd_exec_unit.set_search_pid(active_pid);
+    cmd_exec_unit.set_search_pid(((active_pid >> 31) & 1) ? call_history.top()
+                                                          : active_pid);
     cmd_line->TakeFocus();
 
     // Forcefully update the ctx entries

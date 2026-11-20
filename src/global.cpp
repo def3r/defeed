@@ -1,4 +1,3 @@
-#include <algorithm>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -392,8 +391,3 @@ void SharedBuffer::lock() { mtx.lock(); }
 
 void SharedBuffer::unlock() { mtx.unlock(); }
 
-std::string Utils::str_tolower(std::string s) {
-  std::transform(s.begin(), s.end(), s.begin(),
-                 [](unsigned char c) { return std::tolower(c); });
-  return s;
-}

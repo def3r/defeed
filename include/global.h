@@ -1,5 +1,6 @@
 #pragma once
 
+#include <algorithm>
 #include <fstream>
 #include <map>
 #include <memory>
@@ -92,34 +93,38 @@ struct PageCtx {
   std::vector<std::string> entries{};
 };
 
-struct PCB {
-  static inline std::vector<PageCtx> pctx{};
+namespace PCB {
 
-  // create a page using schemas
-  static PageID create(const Schemas &ss);
-  static PageID create(const Schemas &ss, const std::string &entry_key);
+inline std::vector<PageCtx> pctx{};
 
-  // create a page using schema file name
-  static PageID create(const std::string fname);
+// create a page using schemas
+PageID create(const Schemas &ss);
+PageID create(const Schemas &ss, const std::string &entry_key);
 
-  // create a page using XML::Node
-  static PageID create(XML::Node root, const std::string &entry_key,
-                       const std::vector<std::string> &entries);
+// create a page using schema file name
+PageID create(const std::string fname);
 
-  static PageCtx &getRefTo(const PageID pid);
-  static Schema &getSchemaAt(const PageID pid, const size_t index);
+// create a page using XML::Node
+PageID create(XML::Node root, const std::string &entry_key,
+              const std::vector<std::string> &entries);
 
-  // For temporary pages
-  //
-  // temporary pages have 31st bit set in the PageID
-  struct Temp {
-    UNUSED static inline std::unordered_map<PageID, PageCtx> t_pctx{};
-    static inline PageCtx tp{};
+PageCtx &getRefTo(const PageID pid);
+Schema &getSchemaAt(const PageID pid, const size_t index);
 
-    // create a temporary page using schema file name
-    static PageID create(const Schemas &ss);
-  };
-};
+// For temporary pages
+//
+// temporary pages have 31st bit set in the PageID
+namespace Temp {
+
+UNUSED inline std::unordered_map<PageID, PageCtx> t_pctx{};
+inline PageCtx tp{};
+
+// create a temporary page using schema file name
+PageID create(const Schemas &ss);
+
+}; // namespace Temp
+
+}; // namespace PCB
 
 // FIXME: Get rid of ts
 struct RssFeed {
@@ -139,41 +144,41 @@ struct RssFeed {
 // Application State/Context
 //
 // (UI also uses this global state insteading of "owning" it)
-struct DefeedCtx {
-  enum class Mode { Normal, Cmd, Search };
-  enum class Task { Ready, Load, Fetch };
-  enum class SwitchPage { Backwards, Forward, UndoBackwards };
+namespace DefeedCtx {
 
-  // clang-format off
-  using UrlPair  = std::pair<std::string, size_t>;
-  using UrlPairs = std::vector<UrlPair>;
-  // clang-format on
+enum class Mode { Normal, Cmd, Search };
+enum class Task { Ready, Load, Fetch };
+enum class SwitchPage { Backwards, Forward, UndoBackwards };
 
-  static inline std::string home{}, defeed{};
-  static inline std::string rss{}, rss_xml{}, rss_info{};
-  static inline std::string defeed_xml{};
+// clang-format off
+using UrlPair  = std::pair<std::string, size_t>;
+using UrlPairs = std::vector<UrlPair>;
+// clang-format on
 
-  // mostly UI specific
-  static inline bool quit = false;
-  static inline bool show_logs = false;
-  static inline Task task = Task::Ready;
-  static inline Mode mode = Mode::Normal;
-  static inline bool shift_focus = false;
-  static inline bool switch_request = false; // Page switch
-  static inline SwitchPage switch_type = SwitchPage::Forward;
-  static inline Schemas toplevel{};
-  static void init();
-  static void setup_dirs();
-  static UrlPairs get_urls();
+inline std::string home{}, defeed{};
+inline std::string rss{}, rss_xml{}, rss_info{};
+inline std::string defeed_xml{};
 
-  static std::vector<std::shared_ptr<RssFeed>> fetchRSS();
-  static std::vector<std::shared_ptr<RssFeed>> loadRSS();
-  static XML::Node loadRSS(const std::string &url);
-  static std::vector<std::string> read_toplevel();
+// mostly UI specific
+inline bool quit = false;
+inline bool show_logs = false;
+inline Task task = Task::Ready;
+inline Mode mode = Mode::Normal;
+inline bool shift_focus = false;
+inline bool switch_request = false; // Page switch
+inline SwitchPage switch_type = SwitchPage::Forward;
+inline Schemas toplevel{};
 
-private:
-  DefeedCtx() = delete;
-};
+void init();
+void setup_dirs();
+UrlPairs get_urls();
+
+std::vector<std::shared_ptr<RssFeed>> fetchRSS();
+std::vector<std::shared_ptr<RssFeed>> loadRSS();
+XML::Node loadRSS(const std::string &url);
+std::vector<std::string> read_toplevel();
+
+}; // namespace DefeedCtx
 
 class SharedBuffer {
 public:
@@ -256,7 +261,11 @@ struct Walker {
 namespace Utils {
 
 // impl from cppreference
-std::string str_tolower(std::string s);
+inline std::string str_tolower(std::string s) {
+  std::transform(s.begin(), s.end(), s.begin(),
+                 [](unsigned char c) { return std::tolower(c); });
+  return s;
+}
 
 } // namespace Utils
 

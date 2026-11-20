@@ -360,6 +360,16 @@ void App::switch_page() {
     // crashes
     Schema &s = PCB::getSchemaAt(active_pid, selected);
     if (s.hasPage()) {
+      if (DefeedCtx::refetch_rss && s.find("rss")) {
+        if (DefeedCtx::refetch_rss_map.find(std::hash<std::string>{}(
+                s.m["rss"])) == DefeedCtx::refetch_rss_map.end()) {
+          // Rss feed was manually refetched and current entry hasn't been
+          // reloaded
+          // TODO: Destroy the current page?
+          goto CREATE_RSS_PAGE;
+        }
+      }
+
       lipg->UpdateEntries(s.pid);
       sb.append("Attached to existing page: " + std::to_string(s.pid));
       SWITCH_EPILOGUE(s.pid);
@@ -374,29 +384,11 @@ void App::switch_page() {
       // NOTE: Special case, we dont create Schema objects for xml that is not
       // used to define Defeed's behaviour. We also do not know what type of
       // layout will the rss xml have. The best we can do is guess!
-      XML::Node rss = DefeedCtx::loadRSS(s.m["rss"]);
-      XML::Internal root = XML::cast_Internal(rss);
-      XML::Siblings &items =
-          (XML::cast_InternalBase(root->children["channel"][0]))
-              ->children["item"];
-
-      std::vector<std::string> entries{};
-      for (int i = 0; i < items.size(); i++) {
-        XML::LeafBase *title = XML::cast_LeafBase(
-            XML::cast_InternalBase(items[i])->children["title"][0]);
-        if (title == nullptr) {
-          sb.append("[PAGE] Title is nullptr");
-          continue;
-        }
-        if (title->content_idx != 0) {
-          sb.append("[PAGE] Title is HTML data");
-          continue;
-        }
-        entries.push_back(std::get<0>(title->content));
-      }
-      PageID new_pg = PCB::create(rss, "title", entries);
-      lipg->UpdateEntries(new_pg, "title");
-      SWITCH_EPILOGUE(new_pg);
+    CREATE_RSS_PAGE:
+      PageID pid = PCB::create(s.m["rss"], "title");
+      lipg->UpdateEntries(pid, "title");
+      DefeedCtx::refetch_rss_map[std::hash<std::string>{}(s.m["rss"])] = 1;
+      SWITCH_EPILOGUE(pid);
 
     } else if (s.find("link")) {
       //  chromium --app=link
@@ -416,7 +408,7 @@ void App::switch_page() {
       PageID pid = call_history.top();
       lipg->UpdateEntries(pid);
       // Don't keep temp pages in history
-      if (!((active_pid >> 31) & 1)) {
+      if (!PCB::Temp::check(active_pid)) {
         call_history_back.push(active_pid);
       }
       active_pid = pid;
@@ -490,8 +482,8 @@ bool App::OnEvent(Event ev) {
     // NOTE: We must inform the clunit about the PageID on which we want to call
     // the recursive search from, because the cureent pid will be replaced with
     // a temp Search Result list page
-    cmd_exec_unit.set_search_pid(((active_pid >> 31) & 1) ? call_history.top()
-                                                          : active_pid);
+    cmd_exec_unit.set_search_pid(
+        PCB::Temp::check(active_pid) ? call_history.top() : active_pid);
     cmd_line->TakeFocus();
 
     // Forcefully update the ctx entries
@@ -523,7 +515,6 @@ App::App()
   status_line  = std::make_unique<StatusLineComponent>();
   page_list    = std::make_shared<ListPage>(DefeedCtx::toplevel);
   app          = Container::Vertical({
-    // Maybe(page_list,    [this] { return /* cur_page == DefeedCtx::Page::List */ true;    }),
     page_list,
 
     Renderer([] { return filler(); }),
@@ -551,6 +542,8 @@ void App::EventLoop() {
 
       case std::future_status::ready:
         DefeedCtx::task = DefeedCtx::Task::Ready;
+        DefeedCtx::refetch_rss = true;
+        DefeedCtx::refetch_rss_map.clear();
         break;
 
       case std::future_status::timeout:
@@ -613,7 +606,6 @@ void CmdLine::exit_search(Event ev) {
   } else if (ev == Event::Escape) {
     parent->switch_page(search_pid);
   }
-
   search_pid = -1;
   search_ss.clear();
 }

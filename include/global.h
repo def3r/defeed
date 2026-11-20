@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <fstream>
 #include <map>
-#include <memory>
 #include <mutex>
 #include <sstream>
 #include <string>
@@ -104,9 +103,8 @@ PageID create(const Schemas &ss, const std::string &entry_key);
 // create a page using schema file name
 PageID create(const std::string fname);
 
-// create a page using XML::Node
-PageID create(XML::Node root, const std::string &entry_key,
-              const std::vector<std::string> &entries);
+// create a page using rss url, with display as entry_key
+PageID create(const std::string url, const std::string &entry_key);
 
 PageCtx &getRefTo(const PageID pid);
 Schema &getSchemaAt(const PageID pid, const size_t index);
@@ -122,24 +120,11 @@ inline PageCtx tp{};
 // create a temporary page using schema file name
 PageID create(const Schemas &ss);
 
+bool check(const PageID pid);
+
 }; // namespace Temp
 
 }; // namespace PCB
-
-// FIXME: Get rid of ts
-struct RssFeed {
-  std::string url{};
-  std::size_t hash{};
-
-  std::string author{};
-  std::string last_updated{};
-
-  std::shared_ptr<XML::NodeBase> root{};
-
-  int list_page_selected = 0;
-  int list_page_max_entries = 0;
-  ftxui::Component list_page_menu = nullptr;
-};
 
 // Application State/Context
 //
@@ -168,13 +153,14 @@ inline bool shift_focus = false;
 inline bool switch_request = false; // Page switch
 inline SwitchPage switch_type = SwitchPage::Forward;
 inline Schemas toplevel{};
+inline bool refetch_rss = false;
+inline std::unordered_map<size_t, char> refetch_rss_map{};
 
 void init();
 void setup_dirs();
 UrlPairs get_urls();
 
-std::vector<std::shared_ptr<RssFeed>> fetchRSS();
-std::vector<std::shared_ptr<RssFeed>> loadRSS();
+void fetchRSS();
 XML::Node loadRSS(const std::string &url);
 std::vector<std::string> read_toplevel();
 
@@ -208,12 +194,6 @@ struct Walker {
   std::string filename = "walker.txt";
   std::fstream fs{};
   XML::NodeBase *root = nullptr;
-  Walker(RssFeed *_Nonnull feed) : root(feed->root.get()) {
-    fs.open(filename, std::ios::out);
-    fs << "[ROOT]\n";
-    walk_internal(0, (XML::InternalBase *)root);
-    fs.close();
-  }
   Walker(XML::NodeBase *_Nonnull feed) : root(feed) {
     fs.open(filename, std::ios::out);
     fs << "[ROOT]\n";

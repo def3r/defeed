@@ -101,7 +101,7 @@ protected:
 class App {
   friend class CmdLine;
 
-  std::future<std::vector<std::shared_ptr<RssFeed>>> f{};
+  std::future<void> f{};
 
   ftxui::App screen;
   CmdLine cmd_exec_unit;

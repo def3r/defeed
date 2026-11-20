@@ -1,7 +1,6 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <memory>
 #include <mutex>
 #include <string>
 #include <vector>
@@ -105,8 +104,30 @@ PageID PCB::create(const std::string fname) {
   return create(ss);
 }
 
-PageID PCB::create(XML::Node root, const std::string &entry_key,
-                   const std::vector<std::string> &entries) {
+// NOTE: Special case, we dont create Schema objects for xml that is not
+// used to define Defeed's behaviour. We also do not know what type of
+// layout will the rss xml have. The best we can do is guess!
+PageID PCB::create(const std::string url, const std::string &entry_key) {
+  XML::Node rss = DefeedCtx::loadRSS(url);
+  XML::Internal root = XML::cast_Internal(rss);
+  XML::Siblings &items =
+      (XML::cast_InternalBase(root->children["channel"][0]))->children["item"];
+
+  std::vector<std::string> entries{};
+  for (int i = 0; i < items.size(); i++) {
+    XML::LeafBase *title = XML::cast_LeafBase(
+        XML::cast_InternalBase(items[i])->children[entry_key][0]);
+    if (title == nullptr) {
+      sb.append("[PAGE] Title is nullptr");
+      continue;
+    }
+    if (title->content_idx != 0) {
+      sb.append("[PAGE] Title is HTML data");
+      continue;
+    }
+    entries.push_back(std::get<0>(title->content));
+  }
+
   PageID pid = PCB::pctx.size();
   PCB::pctx.push_back((PageCtx){
       .pid = pid,
@@ -120,7 +141,7 @@ PageID PCB::create(XML::Node root, const std::string &entry_key,
 
 PageCtx &PCB::getRefTo(const PageID pid) {
   // Is pid referring to a temp page
-  if ((pid >> 31) & 1) {
+  if (PCB::Temp::check(pid)) {
     return PCB::Temp::tp;
   }
 
@@ -129,7 +150,7 @@ PageCtx &PCB::getRefTo(const PageID pid) {
 }
 Schema &PCB::getSchemaAt(const PageID pid, const size_t index) {
   // Is pid referring to a temp page
-  if ((pid >> 31) & 1) {
+  if (PCB::Temp::check(pid)) {
     assert(index < PCB::Temp::tp.ss.size() &&
            "getSchemaAt: index > schema set");
     return PCB::Temp::tp.ss[index];
@@ -145,6 +166,8 @@ PageID PCB::Temp::create(const Schemas &ss) {
   tp = (PageCtx){.pid = pid, .ss = ss};
   return pid;
 }
+
+bool PCB::Temp::check(const PageID pid) { return (pid >> 31) & 1; }
 
 void DefeedCtx::init() {
   const char *env_home = std::getenv("HOME");
@@ -211,8 +234,6 @@ DefeedCtx::UrlPairs DefeedCtx::get_urls() {
 
   const XML::Siblings &items = r->children["item"];
   for (int i = 0; i < items.size(); i++) {
-    Schema s{};
-
     XML::Leaf l =
         XML::cast_Leaf((XML::cast_Internal(items[i]))->children["rss"][0]);
     if (l->content_idx != 0) {
@@ -223,16 +244,13 @@ DefeedCtx::UrlPairs DefeedCtx::get_urls() {
     size_t hash = std::hash<std::string>{}(url);
     sb.append(std::to_string(hash) + "\t\t" + url);
     rss_urls.push_back({url, hash});
-
-    // TODO: populate other tags into schema as well
-    s.put("rss", url);
   }
 
   return rss_urls;
 }
 
 // TODO: This is increasing couplic for global.cpp, maybe move somewhere else
-std::vector<std::shared_ptr<RssFeed>> DefeedCtx::fetchRSS() {
+void DefeedCtx::fetchRSS() {
   DefeedCtx::UrlPairs rss_urls = DefeedCtx::get_urls();
 
   MultiFetcher fetch_rss{};
@@ -267,10 +285,6 @@ std::vector<std::shared_ptr<RssFeed>> DefeedCtx::fetchRSS() {
   fetch_rss.perform_write();
   cond_fetch_rss.perform_write();
   sb.append("Completed fetches!");
-
-  std::vector<std::shared_ptr<RssFeed>> nodes = DefeedCtx::loadRSS();
-
-  return std::move(nodes);
 }
 
 XML::Node DefeedCtx::loadRSS(const std::string &url) {
@@ -294,28 +308,6 @@ XML::Node DefeedCtx::loadRSS(const std::string &url) {
   XML::Extract x{file_name};
   x.extract();
   return x.get_root();
-}
-
-// TODO: This is sequential for now but consider using async in future
-std::vector<std::shared_ptr<RssFeed>> DefeedCtx::loadRSS() {
-  std::vector<std::shared_ptr<RssFeed>> feeds;
-  DefeedCtx::UrlPairs rss_urls = DefeedCtx::get_urls();
-
-  for (auto [url, hash] : rss_urls) {
-    const std::string dir_name{DefeedCtx::rss + "/" + std::to_string(hash)};
-    const std::string file_name{dir_name + "/rssfeed.txt"};
-
-    XML::Extract x{file_name};
-    x.extract();
-
-    std::unique_ptr<RssFeed> feed = std::make_unique<RssFeed>();
-    feed->url = url;
-    feed->hash = hash;
-    feed->root = x.get_root();
-    feeds.emplace_back(std::move(feed));
-  }
-
-  return std::move(feeds);
 }
 
 std::vector<std::string> DefeedCtx::read_toplevel() {
@@ -390,4 +382,3 @@ const std::size_t SharedBuffer::getTotalEntries() {
 void SharedBuffer::lock() { mtx.lock(); }
 
 void SharedBuffer::unlock() { mtx.unlock(); }
-

@@ -25,6 +25,11 @@ struct CmdLine {
   Schemas Search(const std::string &needle);
 
   void set_search_pid(const PageID pid);
+  void exit_search(Event ev);
+
+private:
+  Schemas search_ss{};
+  void search_schemas(const PageID search_pid, const std::string l_needle);
 
 private:
   UI::App *parent = nullptr;

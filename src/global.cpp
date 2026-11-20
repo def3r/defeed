@@ -82,6 +82,30 @@ PageID PCB::create(const Schemas &ss, const std::string &entry_key) {
   return pid;
 }
 
+PageID PCB::create(const std::string fname) {
+  Schemas ss{};
+  XML::Extract x{fname};
+  x.extract();
+  XML::Internal root = XML::cast_Internal(x.get_root());
+  XML::Siblings &items = root->children["item"];
+  for (XML::Node &item : items) {
+    Schema s_child{};
+    assert(item->type == XML::NodeType::Internal &&
+           "Nested Internal nodes not supported yet!");
+    XML::Internal internal = XML::cast_Internal(item);
+    for (auto &[key, sibs] : internal->children) {
+      assert(sibs.size() <= 1 && "Probable duplicate tags");
+      XML::Leaf leaf = XML::cast_Leaf(sibs[0]);
+      assert(leaf->content_idx == 0 && "Expected string content, got HTML");
+      std::string val = std::get<0>(leaf->content);
+      s_child.put(key, val);
+    }
+    ss.push_back(std::move(s_child));
+  }
+  sb.append("Schema fetched for " + fname);
+  return create(ss);
+}
+
 PageID PCB::create(XML::Node root, const std::string &entry_key,
                    const std::vector<std::string> &entries) {
   PageID pid = PCB::pctx.size();
@@ -96,19 +120,31 @@ PageID PCB::create(XML::Node root, const std::string &entry_key,
 }
 
 PageCtx &PCB::getRefTo(const PageID pid) {
+  // Is pid referring to a temp page
+  if ((pid >> 31) & 1) {
+    return PCB::Temp::tp;
+  }
+
   assert(pid < PCB::pctx.size() && "getRefTo: pid > PCB size");
   return PCB::pctx[pid];
 }
 Schema &PCB::getSchemaAt(const PageID pid, const size_t index) {
+  // Is pid referring to a temp page
+  if ((pid >> 31) & 1) {
+    assert(index < PCB::Temp::tp.ss.size() &&
+           "getSchemaAt: index > schema set");
+    return PCB::Temp::tp.ss[index];
+  }
+
   assert(pid < PCB::pctx.size() && "getSchemaAt: pid > PCB size");
   assert(index < PCB::pctx[pid].ss.size() && "getSchemaAt: index > schema set");
   return PCB::pctx[pid].ss[index];
 }
-PageID PCB::createForSchema(const PageID pid, const size_t index) {
-  assert(pid < PCB::pctx.size() && "createFromSchema: pid > PCB size");
-  assert(index < PCB::pctx[pid].ss.size() &&
-         "createFromSchema: index > schema set");
-  return 0;
+
+PageID PCB::Temp::create(const Schemas &ss) {
+  PageID pid = (1 << 31 | PCB::pctx.size());
+  tp = (PageCtx){.pid = pid, .ss = ss};
+  return pid;
 }
 
 void DefeedCtx::init() {
@@ -356,7 +392,7 @@ void SharedBuffer::lock() { mtx.lock(); }
 
 void SharedBuffer::unlock() { mtx.unlock(); }
 
-std::string str_tolower(std::string s) {
+std::string Utils::str_tolower(std::string s) {
   std::transform(s.begin(), s.end(), s.begin(),
                  [](unsigned char c) { return std::tolower(c); });
   return s;

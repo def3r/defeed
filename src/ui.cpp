@@ -174,16 +174,28 @@ bool CmdLineComponent::OnEvent(Event ev) {
     return false;
 
   if (ev == Event::Escape) {
+    if (DefeedCtx::mode == DefeedCtx::Mode::Search) {
+      this->clunit->exit_search(ev);
+    }
     DefeedCtx::mode = DefeedCtx::Mode::Normal;
     DefeedCtx::shift_focus = true;
     return true;
   }
 
-  if (ev == Event::Return && DefeedCtx::mode == DefeedCtx::Mode::Cmd) {
-    DefeedCtx::mode = DefeedCtx::Mode::Normal;
-    if (this->clunit->Exec(cmd)) {
+  if (ev == Event::Return) {
+    switch (DefeedCtx::mode) {
+    case DefeedCtx::Mode::Cmd:
+      this->clunit->Exec(cmd);
+      break;
+    case DefeedCtx::Mode::Search:
+      this->clunit->exit_search(ev);
+      DefeedCtx::shift_focus = true;
       cmd = "";
+      break;
+    case DefeedCtx::Mode::Normal:
+      break;
     }
+    DefeedCtx::mode = DefeedCtx::Mode::Normal;
     return true;
   }
 
@@ -354,28 +366,9 @@ void App::switch_page() {
 
     } else if (s.find("file")) {
       // NOTE: filenames must be relative to DefeedCtx::defeed
-      XML::Extract x{DefeedCtx::defeed + s.m.find("file")->second};
-      x.extract();
-      Schemas ss;
-      XML::Internal root = XML::cast_Internal(x.get_root());
-      XML::Siblings &items = root->children["item"];
-      for (XML::Node &item : items) {
-        Schema s_child{};
-        assert(item->type == XML::NodeType::Internal &&
-               "Nested Internal nodes not supported yet!");
-        XML::Internal internal = XML::cast_Internal(item);
-        for (auto &[key, sibs] : internal->children) {
-          assert(sibs.size() <= 1 && "Probable duplicate tags");
-          XML::Leaf leaf = XML::cast_Leaf(sibs[0]);
-          assert(leaf->content_idx == 0 && "Expected string content, got HTML");
-          std::string val = std::get<0>(leaf->content);
-          s_child.put(key, val);
-        }
-        ss.push_back(std::move(s_child));
-      }
-      sb.append("Schema fetched for " + s.m["file"]);
-      lipg->UpdateEntries(ss);
-      SWITCH_EPILOGUE(lipg->get_pid());
+      PageID pid = PCB::create(DefeedCtx::defeed + s.m.find("file")->second);
+      lipg->UpdateEntries(pid);
+      SWITCH_EPILOGUE(pid);
 
     } else if (s.find("rss")) {
       // NOTE: Special case, we dont create Schema objects for xml that is not
@@ -422,7 +415,10 @@ void App::switch_page() {
     if (!call_history.empty()) {
       PageID pid = call_history.top();
       lipg->UpdateEntries(pid);
-      call_history_back.push(active_pid);
+      // Don't keep temp pages in history
+      if (!((active_pid >> 31) & 1)) {
+        call_history_back.push(active_pid);
+      }
       active_pid = pid;
       call_history.pop();
       DefeedCtx::switch_request = false;
@@ -496,6 +492,11 @@ bool App::OnEvent(Event ev) {
     // a temp Search Result list page
     cmd_exec_unit.set_search_pid(active_pid);
     cmd_line->TakeFocus();
+
+    // Forcefully update the ctx entries
+    int selected = std::static_pointer_cast<ListPage>(page_list)->GetCurIndex();
+    PageCtx &ctx = PCB::getRefTo(active_pid);
+    ctx.selected = selected;
     return true;
   }
 
@@ -592,6 +593,7 @@ bool CmdLine::Exec(std::string &cmd) {
     retval = false;
   }
 
+  cmd = retval ? "" : cmd;
   return retval;
 }
 
@@ -604,43 +606,61 @@ void CmdLine::set_search_pid(const PageID pid) {
   this->search_pid = pid;
 }
 
+void CmdLine::exit_search(Event ev) {
+  if (ev == Event::Return) {
+    parent->call_history.push(search_pid);
+  } else if (ev == Event::Escape) {
+    parent->switch_page(search_pid);
+  }
+
+  search_pid = -1;
+  search_ss.clear();
+}
+
 Schemas CmdLine::Search(const std::string &needle) {
   assert(search_pid != -1 && "Must set search pid before using Search method");
 
   if (needle.empty()) {
     parent->switch_page(search_pid);
-    sb.append("Restored Page " + std::to_string(search_pid));
     return {};
   }
 
-  PageCtx &pcx = PCB::getRefTo(search_pid);
-  std::string l_needle = needle;
-  l_needle = str_tolower(l_needle);
-
-  Schemas ss{};
-  if (pcx.ss.size()) {
-    for (Schema &s : pcx.ss) {
-      if (s.find("display")) {
-        std::string display = s.m["display"];
-        display = str_tolower(display);
-        if (display.find(l_needle) != std::string::npos) {
-          sb.append(display + " found for " + l_needle);
-          ss.push_back(s);
-        }
-      }
-
-      if (!s.hasPage()) {
-      }
-    }
-  }
+  search_ss.clear();
+  search_schemas(search_pid, Utils::str_tolower(needle));
 
   std::shared_ptr<ListPage> lipg =
       std::static_pointer_cast<ListPage>(parent->page_list);
-  lipg->UpdateEntries(ss);
-  parent->active_pid = lipg->get_pid();
-  sb.append("Updated Entries for " + l_needle);
+  PageID temp_pid = PCB::Temp::create(search_ss);
+  lipg->UpdateEntries(temp_pid);
+  parent->active_pid = temp_pid;
 
-  return ss;
+  return search_ss;
+}
+
+void CmdLine::search_schemas(const PageID search_pid,
+                             const std::string l_needle) {
+  PageCtx &pcx = PCB::getRefTo(search_pid);
+  if (pcx.ss.size()) {
+    for (Schema &s : pcx.ss) {
+      if (s.find("display")) {
+        std::string display = Utils::str_tolower(s.m["display"]);
+        if (display.find(l_needle) != std::string::npos) {
+          sb.append(display + " found for " + l_needle);
+          search_ss.push_back(s);
+        }
+      }
+
+      if (!s.hasPage() && s.find("file")) {
+        // TODO: setting schema's pid should be PCB's responsibility
+        s.pid = PCB::create(DefeedCtx::defeed + s.m.find("file")->second);
+      }
+
+      if (s.hasPage()) {
+        search_schemas(s.pid, l_needle);
+      }
+    }
+  }
+  // TODO: Search in xml roots as well, when ss.size == 0
 }
 
 } // namespace UI

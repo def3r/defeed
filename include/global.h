@@ -99,13 +99,26 @@ struct PCB {
   static PageID create(const Schemas &ss);
   static PageID create(const Schemas &ss, const std::string &entry_key);
 
+  // create a page using schema file name
+  static PageID create(const std::string fname);
+
   // create a page using XML::Node
   static PageID create(XML::Node root, const std::string &entry_key,
                        const std::vector<std::string> &entries);
 
   static PageCtx &getRefTo(const PageID pid);
   static Schema &getSchemaAt(const PageID pid, const size_t index);
-  static PageID createForSchema(const PageID pid, const size_t index);
+
+  // For temporary pages
+  //
+  // temporary pages have 31st bit set in the PageID
+  struct Temp {
+    UNUSED static inline std::unordered_map<PageID, PageCtx> t_pctx{};
+    static inline PageCtx tp{};
+
+    // create a temporary page using schema file name
+    static PageID create(const Schemas &ss);
+  };
 };
 
 // FIXME: Get rid of ts
@@ -240,7 +253,11 @@ struct Walker {
   }
 };
 
+namespace Utils {
+
 // impl from cppreference
 std::string str_tolower(std::string s);
+
+} // namespace Utils
 
 extern SharedBuffer sb;

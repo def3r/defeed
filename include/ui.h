@@ -7,6 +7,7 @@
 #include <ftxui/component/component.hpp>
 
 #include "types.h"
+#include "page.h"
 
 extern SharedBuffer sb;
 
@@ -83,9 +84,9 @@ struct ListPage : public Page {
   explicit ListPage(const Schemas &ss, const std::string &entry_key);
   Element OnRender() override;
   Component update_entries(const PageID pid,
-                           const std::string &entry_key = "display");
+                          const std::string &entry_key = "display");
   Component update_entries(const Schemas &ss,
-                           const std::string &entry_key = "display");
+                          const std::string &entry_key = "display");
   Component update_entries(const std::vector<std::string> &entries);
   void update(Component child);
   void update(Component child, int selected, int max_entries);

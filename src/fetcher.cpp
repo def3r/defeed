@@ -74,7 +74,7 @@ Fetcher::~Fetcher() {
 
 CURLcode Fetcher::perform_write(const std::string &fname) {
   FILE *pagefile = fopen(fname.c_str(), "wb");
-  if (!pagefile) {
+  if (not pagefile) {
   }
   curl_easy_setopt(curl, CURLOPT_WRITEDATA, pagefile);
   res = curl_easy_perform(curl);
@@ -151,7 +151,7 @@ size_t Fetcher::header_callback(char *buffer, size_t size, size_t nitems,
     }
 
     // At this point we assume all the dirs have been setup
-    if (!std::filesystem::is_directory(url_path)) {
+    if (not std::filesystem::is_directory(url_path)) {
       std::abort();
     }
     std::ofstream etag_file{url_path.string() + "/etag"};
@@ -234,8 +234,8 @@ bool MultiFetcher::perform_write() {
 
   for (size_t h : hash) {
     std::filesystem::path url_dir{DefeedCtx::rss + "/" + std::to_string(h)};
-    if (!std::filesystem::is_directory(url_dir)) {
-      if (!std::filesystem::create_directory(url_dir)) {
+    if (not std::filesystem::is_directory(url_dir)) {
+      if (not std::filesystem::create_directory(url_dir)) {
         std::cerr << "Unable to mkdir " << url_dir.string() << std::endl;
         std::abort();
       }
@@ -249,7 +249,7 @@ bool MultiFetcher::perform_write() {
     std::string fname{DefeedCtx::rss + "/" + std::to_string(hash[i]) +
                       "/new_rssfeed.txt"};
     FILE *pagefile = std::fopen(fname.c_str(), "wb");
-    if (!pagefile) {
+    if (not pagefile) {
       std::cerr << "Unable to open file: " << fname << std::endl;
       return false;
     }

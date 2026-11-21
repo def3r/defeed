@@ -43,6 +43,10 @@ UrlPairs getURLs();
 void                     fetchRSS();
 XML::Node                loadRSS(const std::string &url);
 std::vector<std::string> readToplevel();
-// clang-format on
 
+inline bool isModeNormal() { return mode == Mode::Normal; }
+inline bool isModeCmd()    { return mode == Mode::Cmd; };
+inline bool isModeSearch() { return mode == Mode::Search; };
+
+// clang-format on
 }; // namespace DefeedCtx

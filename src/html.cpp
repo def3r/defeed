@@ -1,13 +1,11 @@
-#include <cstdlib>
 #include <cstring>
 #include <iostream>
-#include <memory>
-#include <unordered_map>
 
 #include <libxml/HTMLparser.h>
 #include <libxml/HTMLtree.h>
 
 #include "global.h"
+#include "sb.h"
 #include "html.h"
 
 namespace HTML {
@@ -22,7 +20,7 @@ LeafBase::LeafBase() {
   this->attrs = {};
 }
 
-static Node make_leaf(xmlNode *cur_node) {
+static Node makeLeaf(xmlNode *cur_node) {
   if (cur_node == nullptr) {
     return nullptr;
   }
@@ -42,14 +40,14 @@ static Node make_leaf(xmlNode *cur_node) {
   return std::move(leaf);
 }
 
-static Node make_internal(xmlNode *cur_node) {
+static Node makeInternal(xmlNode *cur_node) {
   if (cur_node == nullptr) {
     return nullptr;
   }
   if (cur_node->type == XML_TEXT_NODE) {
     // std::cout << "make_internal: leaf node passed, requesting make_leaf"
     //           << std::endl;
-    return make_leaf(cur_node);
+    return makeLeaf(cur_node);
   }
   if (cur_node->type != XML_ELEMENT_NODE) {
     sb.append("make_internal: node not an XML_ELEMENT_NODE");
@@ -88,14 +86,14 @@ static Node make_internal(xmlNode *cur_node) {
   Node child;
   for (node = cur_node->children; node; node = node->next) {
     if (node->type == XML_TEXT_NODE) {
-      child = make_leaf(node);
+      child = makeLeaf(node);
       if (child != nullptr) {
         node_obj->children.emplace_back(std::move(child));
       }
     } else if (node->type == XML_ELEMENT_NODE) {
-      child = make_internal(node);
+      child = makeInternal(node);
       if (child != nullptr) {
-        node_obj->children.emplace_back(std::move(make_internal(node)));
+        node_obj->children.emplace_back(std::move(makeInternal(node)));
       }
     }
   }
@@ -119,7 +117,7 @@ Node extract(const xmlChar *str) {
     std::abort();
   }
   xmlNode *root = xmlDocGetRootElement(doc);
-  Node root_node = make_internal(root);
+  Node root_node = makeInternal(root);
 
   xmlFreeDoc(doc);
 

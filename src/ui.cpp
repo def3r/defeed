@@ -1,7 +1,3 @@
-#include "ui.h"
-#include "global.h"
-#include "xml.h"
-
 #include <cassert>
 #include <future>
 #include <iostream>
@@ -16,6 +12,12 @@
 #include <ftxui/dom/elements.hpp>
 #include <ftxui/screen/screen.hpp>
 #include <ftxui/screen/terminal.hpp>
+
+#include "global.h"
+#include "defeed.h"
+#include "sb.h"
+#include "ui.h"
+#include "page.h"
 
 #include <unistd.h>
 
@@ -71,14 +73,14 @@ Element LoadingComponent::OnRender() {
 
 LogMenuComponent::LogMenuComponent() {
   log_menu_idx = 0;
-  entries = sb.getEntries();
+  entries = sb.get_entries();
   Component log_menu =
-      Menu(&entries, &log_menu_idx, LogMenuComponent::menuStyle());
+      Menu(&entries, &log_menu_idx, LogMenuComponent::menu_style());
   Add(log_menu);
 }
 bool LogMenuComponent::Focusable() const { return DefeedCtx::show_logs; }
 Element LogMenuComponent::OnRender() {
-  entries = sb.getEntries();
+  entries = sb.get_entries();
   static std::size_t last_entry_idx = log_menu_idx;
 
   std::size_t cur_entry_count = entries.size();
@@ -109,7 +111,7 @@ bool LogMenuComponent::OnEvent(Event ev) {
 
   return ComponentBase::OnEvent(ev);
 }
-MenuOption LogMenuComponent::menuStyle() {
+MenuOption LogMenuComponent::menu_style() {
   MenuOption option = MenuOption::Vertical();
   option.entries_option.transform = [](EntryState state) {
     Element e = text(" " + state.label + " ");
@@ -185,7 +187,7 @@ bool CmdLineComponent::OnEvent(Event ev) {
   if (ev == Event::Return) {
     switch (DefeedCtx::mode) {
     case DefeedCtx::Mode::Cmd:
-      this->clunit->Exec(cmd);
+      this->clunit->exec(cmd);
       break;
     case DefeedCtx::Mode::Search:
       this->clunit->exit_search(ev);
@@ -201,7 +203,7 @@ bool CmdLineComponent::OnEvent(Event ev) {
 
   if (DefeedCtx::mode == DefeedCtx::Mode::Search) {
     ComponentBase::OnEvent(ev);
-    this->clunit->Search(cmd);
+    this->clunit->search(cmd);
     return true;
   }
 
@@ -209,7 +211,7 @@ bool CmdLineComponent::OnEvent(Event ev) {
 }
 
 bool Page::Focusable() const { return true; }
-MenuOption Page::menuStyle() {
+MenuOption Page::menu_style() {
   MenuOption option = MenuOption::Vertical();
 
   option.entries_option.transform = [](EntryState state) {
@@ -256,8 +258,8 @@ ListPage::ListPage(const Schemas &ss) {
   if (pid == 0) {
     PageCtx &pcx = PCB::getRefTo(pid);
     pcx.entry_key = "display";
-    pcx.entries = Schema::getAll(ss, pcx.entry_key);
-    UpdateEntries(pcx.entries);
+    pcx.entries = Schema::get_all(ss, pcx.entry_key);
+    update_entries(pcx.entries);
   } else {
     assert(0 && "TBD");
   }
@@ -269,8 +271,8 @@ Element ListPage::OnRender() {
   return Render() | vscroll_indicator | yframe |
          size(ftxui::HEIGHT, ftxui::LESS_THAN, pg_size);
 }
-Component ListPage::UpdateEntries(const PageID pid,
-                                  const std::string &entry_key) {
+Component ListPage::update_entries(const PageID pid,
+                                   const std::string &entry_key) {
   this->pid = pid;
   PageCtx &pcx = PCB::getRefTo(pid);
   if (pcx.ss.size() == 0) {
@@ -278,34 +280,34 @@ Component ListPage::UpdateEntries(const PageID pid,
     // populated (assumption)
   } else {
     pcx.entry_key = entry_key;
-    pcx.entries = Schema::getAll(pcx.ss, pcx.entry_key);
+    pcx.entries = Schema::get_all(pcx.ss, pcx.entry_key);
   }
-  Component pg = Menu(pcx.entries, &selected, Page::menuStyle());
-  Update(pg, pcx.selected, pcx.entries.size());
+  Component pg = Menu(pcx.entries, &selected, Page::menu_style());
+  update(pg, pcx.selected, pcx.entries.size());
   return pg;
 }
-Component ListPage::UpdateEntries(const Schemas &ss,
-                                  const std::string &entry_key) {
+Component ListPage::update_entries(const Schemas &ss,
+                                   const std::string &entry_key) {
   pid = PCB::create(ss);
   PageCtx &pcx = PCB::getRefTo(pid);
   pcx.entry_key = entry_key;
-  pcx.entries = Schema::getAll(ss, pcx.entry_key);
+  pcx.entries = Schema::get_all(ss, pcx.entry_key);
   sb.append("PCX Entries: " + std::to_string(pcx.entries.size()));
-  return UpdateEntries(pcx.entries);
+  return update_entries(pcx.entries);
 }
-Component ListPage::UpdateEntries(const std::vector<std::string> &entries) {
+Component ListPage::update_entries(const std::vector<std::string> &entries) {
   selected = 0;
   max_entries = entries.size();
-  Component pg = Menu(entries, &selected, Page::menuStyle());
-  Update(pg);
+  Component pg = Menu(entries, &selected, Page::menu_style());
+  update(pg);
   return pg;
 }
-void ListPage::Update(Component child) {
+void ListPage::update(Component child) {
   selected = 0;
   DetachAllChildren();
   Add(std::move(child));
 }
-void ListPage::Update(Component child, int selected, int max_entries) {
+void ListPage::update(Component child, int selected, int max_entries) {
   this->selected = selected;
   this->max_entries = max_entries;
   DetachAllChildren();
@@ -326,7 +328,7 @@ void App::switch_page(PageID pid) {
   std::shared_ptr<ListPage> lipg =
       std::static_pointer_cast<ListPage>(page_list);
   active_pid = pid;
-  lipg->UpdateEntries(pid);
+  lipg->update_entries(pid);
   sb.append("Attached to existing page: " + std::to_string(pid));
 }
 
@@ -370,14 +372,14 @@ void App::switch_page() {
         }
       }
 
-      lipg->UpdateEntries(s.pid);
+      lipg->update_entries(s.pid);
       sb.append("Attached to existing page: " + std::to_string(s.pid));
       SWITCH_EPILOGUE(s.pid);
 
     } else if (s.find("file")) {
       // NOTE: filenames must be relative to DefeedCtx::defeed
       PageID pid = PCB::create(DefeedCtx::defeed + s.m.find("file")->second);
-      lipg->UpdateEntries(pid);
+      lipg->update_entries(pid);
       SWITCH_EPILOGUE(pid);
 
     } else if (s.find("rss")) {
@@ -386,7 +388,7 @@ void App::switch_page() {
       // layout will the rss xml have. The best we can do is guess!
     CREATE_RSS_PAGE:
       PageID pid = PCB::create(s.m["rss"], "title");
-      lipg->UpdateEntries(pid, "title");
+      lipg->update_entries(pid, "title");
       DefeedCtx::refetch_rss_map[std::hash<std::string>{}(s.m["rss"])] = 1;
       SWITCH_EPILOGUE(pid);
 
@@ -406,7 +408,7 @@ void App::switch_page() {
   } else if (DefeedCtx::switch_type == DefeedCtx::SwitchPage::Backwards) {
     if (!call_history.empty()) {
       PageID pid = call_history.top();
-      lipg->UpdateEntries(pid);
+      lipg->update_entries(pid);
       // Don't keep temp pages in history
       if (!PCB::Temp::check(active_pid)) {
         call_history_back.push(active_pid);
@@ -419,7 +421,7 @@ void App::switch_page() {
   } else if (DefeedCtx::switch_type == DefeedCtx::SwitchPage::UndoBackwards) {
     if (!call_history_back.empty()) {
       PageID pid = call_history_back.top();
-      lipg->UpdateEntries(pid);
+      lipg->update_entries(pid);
       call_history.push(active_pid);
       active_pid = pid;
       call_history_back.pop();
@@ -507,7 +509,7 @@ bool App::OnEvent(Event ev) {
 App::App()
     : screen(ftxui::App::Fullscreen()), cmd_exec_unit(this),
       on_event([this](Event ev) { return OnEvent(ev); }) {
-  DefeedCtx::read_toplevel();
+  DefeedCtx::readToplevel();
 
   // clang-format off
   log          = std::make_shared<LogMenuComponent>();
@@ -530,7 +532,7 @@ App::App()
   // clang-format on
 }
 
-void App::EventLoop() {
+void App::event_loop() {
   Loop l(&screen, app);
   while (!l.HasQuitted() && !DefeedCtx::quit) {
     if (DefeedCtx::task == DefeedCtx::Task::Fetch) {
@@ -564,11 +566,9 @@ void App::EventLoop() {
   }
 }
 
-bool CmdLine::Exec(std::string &cmd) {
+bool CmdLine::exec(std::string &cmd) {
   // clean the stinky string
-  cmd.erase(cmd.find_last_not_of(" \t") + 1);
-  cmd.erase(0, cmd.find_first_not_of(" \t"));
-
+  cmd = Utils::strStrip(cmd);
   bool retval = true;
 
   if (cmd == "log") {
@@ -610,7 +610,7 @@ void CmdLine::exit_search(Event ev) {
   search_ss.clear();
 }
 
-Schemas CmdLine::Search(const std::string &needle) {
+Schemas CmdLine::search(const std::string &needle) {
   assert(search_pid != -1 && "Must set search pid before using Search method");
 
   if (needle.empty()) {
@@ -619,12 +619,12 @@ Schemas CmdLine::Search(const std::string &needle) {
   }
 
   search_ss.clear();
-  search_schemas(search_pid, Utils::str_tolower(needle));
+  search_schemas(search_pid, Utils::strToLower(needle));
 
   std::shared_ptr<ListPage> lipg =
       std::static_pointer_cast<ListPage>(parent->page_list);
   PageID temp_pid = PCB::Temp::create(search_ss);
-  lipg->UpdateEntries(temp_pid);
+  lipg->update_entries(temp_pid);
   parent->active_pid = temp_pid;
 
   return search_ss;
@@ -636,9 +636,8 @@ void CmdLine::search_schemas(const PageID search_pid,
   if (pcx.ss.size()) {
     for (Schema &s : pcx.ss) {
       if (s.find("display")) {
-        std::string display = Utils::str_tolower(s.m["display"]);
+        std::string display = Utils::strToLower(s.m["display"]);
         if (display.find(l_needle) != std::string::npos) {
-          sb.append(display + " found for " + l_needle);
           search_ss.push_back(s);
         }
       }

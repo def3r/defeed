@@ -9,8 +9,11 @@
 
 #include <curl/curl.h>
 
+#include "curl.h"
+#include "defeed.h"
 #include "fetcher.h"
 #include "global.h"
+#include "sb.h"
 
 struct UserData {
   size_t hash;

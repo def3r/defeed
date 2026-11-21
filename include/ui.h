@@ -1,15 +1,12 @@
-#include "global.h"
-
 #include <functional>
 #include <future>
-#include <memory>
 #include <stack>
 #include <string>
 
 #include <ftxui/component/app.hpp>
 #include <ftxui/component/component.hpp>
 
-using namespace std::chrono_literals;
+#include "types.h"
 
 extern SharedBuffer sb;
 
@@ -21,19 +18,18 @@ class App;
 
 struct CmdLine {
   CmdLine(UI::App *parent);
-  bool Exec(std::string &cmd);
-  Schemas Search(const std::string &needle);
-
+  bool exec(std::string &cmd);
+  Schemas search(const std::string &needle);
   void set_search_pid(const PageID pid);
   void exit_search(Event ev);
 
 private:
-  Schemas search_ss{};
   void search_schemas(const PageID search_pid, const std::string l_needle);
 
 private:
   UI::App *parent = nullptr;
   PageID search_pid = -1;
+  Schemas search_ss{};
 };
 
 struct LoadingComponent : public ComponentBase {
@@ -44,7 +40,7 @@ struct LogMenuComponent : public ComponentBase {
   LogMenuComponent();
   Element OnRender() override;
   bool Focusable() const override;
-  static MenuOption menuStyle();
+  static MenuOption menu_style();
   bool OnEvent(Event ev) override;
 
 private:
@@ -70,7 +66,7 @@ private:
 
 struct Page : public ComponentBase, public MenuOption {
   bool Focusable() const override;
-  static MenuOption menuStyle();
+  static MenuOption menu_style();
   bool OnEvent(Event ev) override;
   int GetCurIndex() const;
   int GetMaxIndex() const;
@@ -86,13 +82,13 @@ struct ListPage : public Page {
   explicit ListPage(const Schemas &ss);
   explicit ListPage(const Schemas &ss, const std::string &entry_key);
   Element OnRender() override;
-  Component UpdateEntries(const PageID pid,
-                          const std::string &entry_key = "display");
-  Component UpdateEntries(const Schemas &ss,
-                          const std::string &entry_key = "display");
-  Component UpdateEntries(const std::vector<std::string> &entries);
-  void Update(Component child);
-  void Update(Component child, int selected, int max_entries);
+  Component update_entries(const PageID pid,
+                           const std::string &entry_key = "display");
+  Component update_entries(const Schemas &ss,
+                           const std::string &entry_key = "display");
+  Component update_entries(const std::vector<std::string> &entries);
+  void update(Component child);
+  void update(Component child, int selected, int max_entries);
 
 protected:
   std::vector<std::string> entries{};
@@ -124,7 +120,7 @@ class App {
 
 public:
   App();
-  void EventLoop();
+  void event_loop();
 };
 
 } // namespace UI

@@ -39,8 +39,8 @@ using Leaf = std::shared_ptr<LeafBase>;
 // The only leaf node?
 using TEXT = LeafBase;
 
-static Node make_leaf(xmlNode *cur_node);
-static Node make_internal(xmlNode *cur_node);
+static Node makeLeaf(xmlNode *cur_node);
+static Node makeInternal(xmlNode *cur_node);
 Node extract(const xmlChar *str);
 void walk(HTML::NodeBase *root);
 

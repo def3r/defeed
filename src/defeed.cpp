@@ -1,173 +1,11 @@
 #include <filesystem>
-#include <fstream>
 #include <iostream>
-#include <mutex>
-#include <string>
-#include <vector>
 
-#include <curl/curl.h>
-
+#include "defeed.h"
 #include "fetcher.h"
 #include "global.h"
-#include "xml.h"
-
-CurlGlobal::CurlGlobal() {}
-
-void CurlGlobal::init() {
-  static bool cinit = false;
-  if (cinit == true) {
-    return;
-  }
-  CURLcode result = curl_global_init(CURL_GLOBAL_ALL);
-  if (result != CURLE_OK) {
-    std::cerr << "Could not init curl" << std::endl;
-    std::exit(1);
-  }
-  cinit = true;
-}
-
-void CurlGlobal::cleanup() {
-  static bool ccleanup = false;
-  if (ccleanup == true) {
-    return;
-  }
-  curl_global_cleanup();
-  ccleanup = true;
-}
-
-void Schema::put(const std::string &key, const std::string &val) {
-  this->m[key] = val;
-
-  Schema::fieldEncodeTy::iterator it;
-  if ((it = Schema::fieldEncode.find(key)) == Schema::fieldEncode.end()) {
-    this->fields |= Schema::Field::OTHER;
-  } else {
-    this->fields |= it->second;
-  }
-}
-
-bool Schema::find(const std::string &key) const {
-  if (this->m.find(key) == this->m.end())
-    return false;
-  return true;
-}
-
-std::vector<std::string> Schema::getAll(const Schemas &ss,
-                                        const std::string &key) {
-  std::vector<std::string> entries{};
-  for (const Schema &s : ss) {
-    std::unordered_map<std::string, std::string>::const_iterator it =
-        s.m.find(key);
-
-    if (it == s.m.end())
-      continue;
-
-    entries.push_back(it->second);
-  }
-  return entries;
-}
-
-bool Schema::hasPage() { return pid != -1; }
-
-PageID PCB::create(const Schemas &ss) {
-  PageID pid = PCB::pctx.size();
-  PCB::pctx.push_back((PageCtx){.pid = pid, .ss = ss});
-  return pid;
-}
-PageID PCB::create(const Schemas &ss, const std::string &entry_key) {
-  PageID pid = PCB::pctx.size();
-  PCB::pctx.push_back((PageCtx){.pid = pid, .ss = ss, .entry_key = entry_key});
-  return pid;
-}
-
-PageID PCB::create(const std::string fname) {
-  Schemas ss{};
-  XML::Extract x{fname};
-  x.extract();
-  XML::Internal root = XML::cast_Internal(x.get_root());
-  XML::Siblings &items = root->children["item"];
-  for (XML::Node &item : items) {
-    Schema s_child{};
-    assert(item->type == XML::NodeType::Internal &&
-           "Nested Internal nodes not supported yet!");
-    XML::Internal internal = XML::cast_Internal(item);
-    for (auto &[key, sibs] : internal->children) {
-      assert(sibs.size() <= 1 && "Probable duplicate tags");
-      XML::Leaf leaf = XML::cast_Leaf(sibs[0]);
-      assert(leaf->content_idx == 0 && "Expected string content, got HTML");
-      std::string val = std::get<0>(leaf->content);
-      s_child.put(key, val);
-    }
-    ss.push_back(std::move(s_child));
-  }
-  sb.append("Schema fetched for " + fname);
-  return create(ss);
-}
-
-// NOTE: Special case, we dont create Schema objects for xml that is not
-// used to define Defeed's behaviour. We also do not know what type of
-// layout will the rss xml have. The best we can do is guess!
-PageID PCB::create(const std::string url, const std::string &entry_key) {
-  XML::Node rss = DefeedCtx::loadRSS(url);
-  XML::Internal root = XML::cast_Internal(rss);
-  XML::Siblings &items =
-      (XML::cast_InternalBase(root->children["channel"][0]))->children["item"];
-
-  std::vector<std::string> entries{};
-  for (int i = 0; i < items.size(); i++) {
-    XML::LeafBase *title = XML::cast_LeafBase(
-        XML::cast_InternalBase(items[i])->children[entry_key][0]);
-    if (title == nullptr) {
-      sb.append("[PAGE] Title is nullptr");
-      continue;
-    }
-    if (title->content_idx != 0) {
-      sb.append("[PAGE] Title is HTML data");
-      continue;
-    }
-    entries.push_back(std::get<0>(title->content));
-  }
-
-  PageID pid = PCB::pctx.size();
-  PCB::pctx.push_back((PageCtx){
-      .pid = pid,
-      .ss = {},
-      .root = root,
-      .entry_key = entry_key,
-      .entries = entries,
-  });
-  return pid;
-}
-
-PageCtx &PCB::getRefTo(const PageID pid) {
-  // Is pid referring to a temp page
-  if (PCB::Temp::check(pid)) {
-    return PCB::Temp::tp;
-  }
-
-  assert(pid < PCB::pctx.size() && "getRefTo: pid > PCB size");
-  return PCB::pctx[pid];
-}
-Schema &PCB::getSchemaAt(const PageID pid, const size_t index) {
-  // Is pid referring to a temp page
-  if (PCB::Temp::check(pid)) {
-    assert(index < PCB::Temp::tp.ss.size() &&
-           "getSchemaAt: index > schema set");
-    return PCB::Temp::tp.ss[index];
-  }
-
-  assert(pid < PCB::pctx.size() && "getSchemaAt: pid > PCB size");
-  assert(index < PCB::pctx[pid].ss.size() && "getSchemaAt: index > schema set");
-  return PCB::pctx[pid].ss[index];
-}
-
-PageID PCB::Temp::create(const Schemas &ss) {
-  PageID pid = (1 << 31 | PCB::pctx.size());
-  tp = (PageCtx){.pid = pid, .ss = ss};
-  return pid;
-}
-
-bool PCB::Temp::check(const PageID pid) { return (pid >> 31) & 1; }
+#include "page.h"
+#include "sb.h"
 
 void DefeedCtx::init() {
   const char *env_home = std::getenv("HOME");
@@ -185,7 +23,7 @@ void DefeedCtx::init() {
   // clang-format on
 }
 
-void DefeedCtx::setup_dirs() {
+void DefeedCtx::setupDirs() {
   namespace fs = std::filesystem;
   fs::path defeed_dir{DefeedCtx::defeed};
   if (!fs::is_directory(defeed_dir)) {
@@ -205,7 +43,7 @@ void DefeedCtx::setup_dirs() {
 
 // TODO: this only reads from the rss.xml one time per launch, maybe have a cmd
 // to force read it
-DefeedCtx::UrlPairs DefeedCtx::get_urls() {
+DefeedCtx::UrlPairs DefeedCtx::getURLs() {
   // The first time we get urls, we must populate the schema
   static DefeedCtx::UrlPairs rss_urls{};
   if (rss_urls.size() != 0) {
@@ -215,7 +53,7 @@ DefeedCtx::UrlPairs DefeedCtx::get_urls() {
   XML::Extract parse_xml{DefeedCtx::rss_xml};
   parse_xml.extract();
   XML::Node root = parse_xml.get_root();
-  Walker w(root.get());
+  Utils::Walker w(root.get());
 
   XML::Internal r = XML::cast_Internal(root);
   if (r->children["category"].empty()) {
@@ -251,7 +89,7 @@ DefeedCtx::UrlPairs DefeedCtx::get_urls() {
 
 // TODO: This is increasing couplic for global.cpp, maybe move somewhere else
 void DefeedCtx::fetchRSS() {
-  DefeedCtx::UrlPairs rss_urls = DefeedCtx::get_urls();
+  DefeedCtx::UrlPairs rss_urls = DefeedCtx::getURLs();
 
   MultiFetcher fetch_rss{};
   MultiFetcher cond_fetch_rss{};
@@ -310,7 +148,7 @@ XML::Node DefeedCtx::loadRSS(const std::string &url) {
   return x.get_root();
 }
 
-std::vector<std::string> DefeedCtx::read_toplevel() {
+std::vector<std::string> DefeedCtx::readToplevel() {
   std::vector<std::string> entries{};
   XML::Extract x{defeed_xml};
   x.extract();
@@ -348,37 +186,3 @@ std::vector<std::string> DefeedCtx::read_toplevel() {
   }
   return entries;
 }
-
-SharedBuffer::SharedBuffer() {
-  buf.reserve(4096 * 8);
-  entries.reserve(4096 * 8);
-  lfile.open("log.txt", std::ios::out);
-};
-
-std::string SharedBuffer::getString() {
-  std::unique_lock lock{mtx};
-  return std::string(buf.begin(), buf.end());
-}
-
-void SharedBuffer::append(const std::string &s) {
-  std::unique_lock lock{mtx};
-  char *data = buf.data() + buf.size();
-  buf.insert(buf.end(), s.begin(), s.end());
-  entries.emplace_back(std::string_view(data, s.size()));
-  lfile << s << std::endl;
-  // TODO: buf sizecheck and invalidation on realloc
-}
-
-const std::vector<std::string_view> &SharedBuffer::getEntries() {
-  std::unique_lock lock{mtx};
-  return this->entries;
-}
-
-const std::size_t SharedBuffer::getTotalEntries() {
-  std::unique_lock lock{mtx};
-  return this->entries.size();
-}
-
-void SharedBuffer::lock() { mtx.lock(); }
-
-void SharedBuffer::unlock() { mtx.unlock(); }

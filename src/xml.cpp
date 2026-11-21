@@ -5,6 +5,7 @@
 
 #include "global.h"
 #include "html.h"
+#include "sb.h"
 #include "xml.h"
 
 namespace XML {
@@ -72,9 +73,7 @@ Extract &Extract::operator=(Extract &&other) {
 
 // Calling function assign
 // Called  function allocates
-void Extract::extract() {
-  root_node = make_internal(root->children);
-}
+void Extract::extract() { root_node = make_internal(root->children); }
 
 void Extract::walk() {
   sb.append("NODE: ROOT");

@@ -1,4 +1,3 @@
-#include <cassert>
 #include <future>
 #include <iostream>
 #include <memory>

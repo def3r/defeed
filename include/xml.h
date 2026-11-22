@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cassert>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -10,6 +9,7 @@
 #include <libxml/parser.h>
 #include <libxml/tree.h>
 
+#include "global.h"
 #include "html.h"
 
 namespace XML {
@@ -33,6 +33,7 @@ struct InternalBase : public NodeBase {
   Children children{};
 
   InternalBase();
+  bool contains(const std::string &key);
 
   // TODO: Here Do we need to destroy the children explicitly?
 };
@@ -43,6 +44,8 @@ struct LeafBase : public NodeBase {
   int content_idx = 0;
 
   LeafBase();
+  std::string get_content_string();
+  bool is_content_string();
 };
 using Leaf = std::shared_ptr<XML::LeafBase>;
 
@@ -101,27 +104,32 @@ private:
 // Cast from shared_ptr<NodeBase> to
 //
 inline XML::Internal cast_Internal(const XML::Node &FROM_NODE) {
-  assert(FROM_NODE->type == XML::NodeType::Internal &&
-         "Invalid cast to Internal XML Node");
+  Utils::Assert(FROM_NODE->type == XML::NodeType::Internal,
+                "Invalid cast to Internal XML Node");
   return std::static_pointer_cast<XML::InternalBase>(FROM_NODE);
 }
 
 inline XML::InternalBase *cast_InternalBase(const XML::Node &FROM_NODE) {
-  assert(FROM_NODE->type == XML::NodeType::Internal &&
-         "Invalid cast to Internal XML Node Base");
+  Utils::Assert(FROM_NODE->type == XML::NodeType::Internal,
+                "Invalid cast to Internal XML Node Base");
   return static_cast<XML::InternalBase *>(FROM_NODE.get());
 }
 
 inline XML::Leaf cast_Leaf(const XML::Node &FROM_NODE) {
-  assert(FROM_NODE->type == XML::NodeType::Leaf &&
-         "Invalid cast to Leaf XML Node");
+  Utils::Assert(FROM_NODE->type == XML::NodeType::Leaf,
+                "Invalid cast to Leaf XML Node");
   return std::static_pointer_cast<XML::LeafBase>(FROM_NODE);
 }
 
 inline XML::LeafBase *cast_LeafBase(const XML::Node &FROM_NODE) {
-  assert(FROM_NODE->type == XML::NodeType::Leaf &&
-         "Invalid cast to Leaf XML Node Base");
+  Utils::Assert(FROM_NODE->type == XML::NodeType::Leaf,
+                "Invalid cast to Leaf XML Node Base");
   return static_cast<XML::LeafBase *>(FROM_NODE.get());
+}
+
+inline void mustContain(Children &children, const std::string &key) {
+  Utils::Assert(children.find(key) != children.end(),
+                "children must contain " + key);
 }
 
 } // namespace XML

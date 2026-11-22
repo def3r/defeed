@@ -23,6 +23,8 @@ void init() {
   rss_info   = rss    + ".info";
   defeed_xml = defeed + "defeed.xml";
   // clang-format on
+
+  PCB::init();
 }
 
 void setupDirs() {
@@ -55,19 +57,19 @@ UrlPairs getURLs() {
   XML::Extract parse_xml{rss_xml};
   parse_xml.extract();
   XML::Node root = parse_xml.get_root();
-  Utils::Walker w(root.get());
+  Walker w(root.get());
 
   XML::Internal r = XML::cast_Internal(root);
-  if (r->children["category"].empty()) {
+  if (not r->contains("category")) {
     sb.append("Category not found");
     return {};
   } else if (XML::Leaf child = XML::cast_Leaf(r->children["category"][0])) {
-    if (child->content_idx != 0) {
+    std::string val{};
+    if (child->is_content_string()) {
       sb.append("Expected a string but got HTML in <category>");
       return {};
-    } else if (std::get<0>(child->content) != "rss") {
-      sb.append("Expected rss but got " + std::get<0>(child->content) +
-                " in <category>");
+    } else if ((val = child->get_content_string()) != "rss") {
+      sb.append("Expected rss but got " + val + " in <category>");
       return {};
     }
   }
@@ -76,11 +78,11 @@ UrlPairs getURLs() {
   for (int i = 0; i < items.size(); i++) {
     XML::Leaf l =
         XML::cast_Leaf((XML::cast_Internal(items[i]))->children["rss"][0]);
-    if (l->content_idx != 0) {
+    if (l->is_content_string()) {
       sb.append("link not string but HTML");
       continue;
     }
-    std::string url = std::get<0>(l->content);
+    std::string url = l->get_content_string();
     size_t hash = std::hash<std::string>{}(url);
     sb.append(std::to_string(hash) + "\t\t" + url);
     rss_urls.push_back({url, hash});
@@ -150,8 +152,8 @@ XML::Node loadRSS(const std::string &url) {
   return x.get_root();
 }
 
-std::vector<std::string> readToplevel() {
-  std::vector<std::string> entries{};
+Strings readToplevel() {
+  Strings entries{};
   XML::Extract x{defeed_xml};
   x.extract();
   XML::Internal root = XML::cast_Internal(x.get_root());
@@ -159,30 +161,20 @@ std::vector<std::string> readToplevel() {
   for (XML::Node item : items) {
     Schema s{};
     XML::Internal i_item = XML::cast_Internal(item);
-    assert(i_item->children.find("display") != i_item->children.end() &&
-           "top level item must contain display");
+    XML::mustContain(i_item->children, "display");
     XML::Leaf leaf = XML::cast_Leaf(i_item->children["display"][0]);
-    assert(leaf->content_idx == 0 &&
-           "top level item display content must be string");
-    std::string display = std::get<0>(leaf->content);
-    s.put("display", display);
+    s.put("display", leaf->get_content_string());
 
-    assert((i_item->children.find("file") != i_item->children.end() ||
-            i_item->children.find("link") != i_item->children.end()) &&
-           "top level item must contain file or external link");
-    if (i_item->children.find("file") != i_item->children.end()) {
-      leaf = XML::cast_Leaf(i_item->children["file"][0]);
-      assert(leaf->content_idx == 0 &&
-             "top level item file content must be string");
-      std::string filename = std::get<0>(leaf->content);
-      s.put("file", filename);
-    } else if (i_item->children.find("link") != i_item->children.end()) {
-      leaf = XML::cast_Leaf(i_item->children["link"][0]);
-      assert(leaf->content_idx == 0 &&
-             "top level item link content must be string");
-      std::string link = std::get<0>(leaf->content);
-      s.put("link", link);
+    std::string key = "";
+    if (i_item->contains("file")) {
+      key = "file";
+    } else if (i_item->contains("link")) {
+      key = "link";
+    } else {
+      Utils::Assert(false, "top level item must contain file or external link");
     }
+    leaf = XML::cast_Leaf(i_item->children[key][0]);
+    s.put(key, leaf->get_content_string());
 
     toplevel.push_back(s);
   }

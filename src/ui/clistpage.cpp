@@ -15,7 +15,7 @@ ListPage::ListPage(const Schemas &ss) {
     pcx.entries = Schema::get_all(ss, pcx.entry_key);
     update_entries(pcx.entries);
   } else {
-    assert(0 && "TBD");
+    Utils::Assert(0, "TBD");
   }
 }
 
@@ -54,7 +54,7 @@ Component ListPage::update_entries(const Schemas &ss,
   return update_entries(pcx.entries);
 }
 
-Component ListPage::update_entries(const std::vector<std::string> &entries) {
+Component ListPage::update_entries(const Strings &entries) {
   selected = 0;
   max_entries = entries.size();
   Component pg = Menu(entries, &selected, Page::menu_style());

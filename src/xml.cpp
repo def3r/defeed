@@ -15,11 +15,22 @@ InternalBase::InternalBase() {
   this->attrs = {};
 }
 
+bool InternalBase::contains(const std::string &key) {
+  return children.find(key) != children.end();
+}
+
 LeafBase::LeafBase() {
   this->type = NodeType::Leaf;
   this->attrs = {};
   content_idx = 0;
 }
+
+std::string LeafBase::get_content_string() {
+  Utils::Assert(is_content_string(), "content expected to be string");
+  return std::get<0>(content);
+}
+
+bool LeafBase::is_content_string() { return content_idx == 0; }
 
 Extract::~Extract() {
   if (doc != nullptr) {

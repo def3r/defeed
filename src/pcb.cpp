@@ -1,7 +1,7 @@
+#include "defeed.h"
 #include "global.h"
 #include "page.h"
 #include "sb.h"
-#include "defeed.h"
 
 PageID PCB::create(const Schemas &ss) {
   PageID pid = PCB::pctx.size();
@@ -22,14 +22,11 @@ PageID PCB::create(const std::string fname) {
   XML::Siblings &items = root->children["item"];
   for (XML::Node &item : items) {
     Schema s_child{};
-    assert(item->type == XML::NodeType::Internal &&
-           "Nested Internal nodes not supported yet!");
     XML::Internal internal = XML::cast_Internal(item);
     for (auto &[key, sibs] : internal->children) {
-      assert(sibs.size() <= 1 && "Probable duplicate tags");
+      Utils::Assert(sibs.size() <= 1, "Probable duplicate tags");
       XML::Leaf leaf = XML::cast_Leaf(sibs[0]);
-      assert(leaf->content_idx == 0 && "Expected string content, got HTML");
-      std::string val = std::get<0>(leaf->content);
+      std::string val = leaf->get_content_string();
       s_child.put(key, val);
     }
     ss.push_back(std::move(s_child));
@@ -45,21 +42,21 @@ PageID PCB::create(const std::string url, const std::string &entry_key) {
   XML::Node rss = DefeedCtx::loadRSS(url);
   XML::Internal root = XML::cast_Internal(rss);
   XML::Siblings &items =
-      (XML::cast_InternalBase(root->children["channel"][0]))->children["item"];
+      (XML::cast_Internal(root->children["channel"][0]))->children["item"];
 
-  std::vector<std::string> entries{};
+  Strings entries{};
   for (int i = 0; i < items.size(); i++) {
-    XML::LeafBase *title = XML::cast_LeafBase(
-        XML::cast_InternalBase(items[i])->children[entry_key][0]);
+    XML::Leaf title =
+        XML::cast_Leaf(XML::cast_Internal(items[i])->children[entry_key][0]);
     if (title == nullptr) {
       sb.append("[PAGE] Title is nullptr");
       continue;
     }
-    if (title->content_idx != 0) {
+    if (title->is_content_string()) {
       sb.append("[PAGE] Title is HTML data");
       continue;
     }
-    entries.push_back(std::get<0>(title->content));
+    entries.push_back(title->get_content_string());
   }
 
   PageID pid = PCB::pctx.size();
@@ -79,19 +76,20 @@ PageCtx &PCB::getRefTo(const PageID pid) {
     return PCB::Temp::tp;
   }
 
-  assert(pid < PCB::pctx.size() && "getRefTo: pid > PCB size");
+  Utils::Assert(pid < PCB::pctx.size(), "getRefTo: pid > PCB size");
   return PCB::pctx[pid];
 }
 Schema &PCB::getSchemaAt(const PageID pid, const size_t index) {
   // Is pid referring to a temp page
   if (PCB::Temp::check(pid)) {
-    assert(index < PCB::Temp::tp.ss.size() &&
-           "getSchemaAt: index > schema set");
+    Utils::Assert(index < PCB::Temp::tp.ss.size(),
+                  "getSchemaAt: index > schema set");
     return PCB::Temp::tp.ss[index];
   }
 
-  assert(pid < PCB::pctx.size() && "getSchemaAt: pid > PCB size");
-  assert(index < PCB::pctx[pid].ss.size() && "getSchemaAt: index > schema set");
+  Utils::Assert(pid < PCB::pctx.size(), "getSchemaAt: pid > PCB size");
+  Utils::Assert(index < PCB::pctx[pid].ss.size(),
+                "getSchemaAt: index > schema set");
   return PCB::pctx[pid].ss[index];
 }
 

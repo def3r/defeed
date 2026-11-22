@@ -87,12 +87,12 @@ struct ListPage : public Page {
                           const std::string &entry_key = "display");
   Component update_entries(const Schemas &ss,
                           const std::string &entry_key = "display");
-  Component update_entries(const std::vector<std::string> &entries);
+  Component update_entries(const Strings &entries);
   void update(Component child);
   void update(Component child, int selected, int max_entries);
 
 protected:
-  std::vector<std::string> entries{};
+  Strings entries{};
 };
 
 class App {

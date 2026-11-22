@@ -56,8 +56,7 @@ struct Schema {
 
   void put(const std::string &key, const std::string &val);
   bool find(const std::string &key) const;
-  static std::vector<std::string> get_all(const Schemas &ss,
-                                          const std::string &key);
+  static Strings get_all(const Schemas &ss, const std::string &key);
   bool hasPage();
 };
 
@@ -73,12 +72,14 @@ struct PageCtx {
 
   int selected = 0;
   std::string entry_key = "";
-  std::vector<std::string> entries{};
+  Strings entries{};
 };
 
 namespace PCB {
 
 inline std::vector<PageCtx> pctx{};
+
+inline void init() { pctx.reserve(32); }
 
 // create a page using schemas
 PageID create(const Schemas &ss);

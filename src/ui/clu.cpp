@@ -33,7 +33,7 @@ bool CmdLine::exec(std::string &cmd) {
 }
 
 CmdLine::CmdLine(UI::App *_Nonnull parent) : parent(parent) {
-  assert(parent && "CmdLine cannot have nullptr for parent");
+  Utils::Assert(parent, "CmdLine cannot have nullptr for parent");
 }
 
 void CmdLine::set_search_pid(const PageID pid) {
@@ -52,7 +52,8 @@ void CmdLine::exit_search(Event ev) {
 }
 
 Schemas CmdLine::search(const std::string &needle) {
-  assert(search_pid != -1 && "Must set search pid before using Search method");
+  Utils::Assert(search_pid != -1,
+                "Must set search pid before using Search method");
 
   if (needle.empty()) {
     parent->switch_page(search_pid);

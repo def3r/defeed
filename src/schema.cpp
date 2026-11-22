@@ -17,9 +17,9 @@ bool Schema::find(const std::string &key) const {
   return true;
 }
 
-std::vector<std::string> Schema::get_all(const Schemas &ss,
+Strings Schema::get_all(const Schemas &ss,
                                          const std::string &key) {
-  std::vector<std::string> entries{};
+  Strings entries{};
   for (const Schema &s : ss) {
     std::unordered_map<std::string, std::string>::const_iterator it =
         s.m.find(key);

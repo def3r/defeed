@@ -45,9 +45,9 @@ PageID PCB::create(const std::string url, const std::string &entry_key) {
       (XML::cast_Internal(root->children["channel"][0]))->children["item"];
 
   Strings entries{};
-  for (int i = 0; i < items.size(); i++) {
+  for (XML::Node &item : items) {
     XML::Leaf title =
-        XML::cast_Leaf(XML::cast_Internal(items[i])->children[entry_key][0]);
+        XML::cast_Leaf(XML::cast_Internal(item)->children[entry_key][0]);
     if (title == nullptr) {
       sb.append("[PAGE] Title is nullptr");
       continue;

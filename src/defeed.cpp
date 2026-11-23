@@ -52,8 +52,11 @@ void setupDirs() {
     file << "<defeed>\n";
     file << "  <category>defeedtoplevel</category>\n";
     file << "  <item>\n";
-    file << "    <display>Welcome to Defeeed, Press enter to checkout how to create the config!</display>\n";
-    file << "    <link>https://github.com/def3r/defeed/blob/main/readme.txt</link>\n";
+    file << "    <display>Welcome to Defeeed, Press enter to checkout how to "
+            "create the config!</display>\n";
+    file << "    "
+            "<link>https://github.com/def3r/defeed/blob/main/readme.txt</"
+            "link>\n";
     file << "  </item>\n";
     file << "</defeed>\n";
     file.close();
@@ -90,9 +93,9 @@ UrlPairs getURLs() {
   }
 
   const XML::Siblings &items = r->children["item"];
-  for (int i = 0; i < items.size(); i++) {
+  for (XML::Node item : items) {
     XML::Leaf l =
-        XML::cast_Leaf((XML::cast_Internal(items[i]))->children["rss"][0]);
+        XML::cast_Leaf((XML::cast_Internal(item))->children["rss"][0]);
     if (l->is_content_string()) {
       sb.append("link not string but HTML");
       continue;

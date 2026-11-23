@@ -111,9 +111,12 @@ void App::switch_page() {
       sb.append("Launching Chromium: " + link);
       pid_t child = fork();
       if (child == 0) {
-	// TODO: to force x11 platform, works for wsl, will fail on wayland (probably)
-	execlp("chromium", "chromium", link.c_str(), "--ozone-platform=x11",
-			">/dev/null", "2>&1",  nullptr);
+        // TODO: to force x11 platform, works for wsl, will fail on wayland
+        // (probably) Update: doesn't work for wayland execlp("chromium",
+        // "chromium", link.c_str(), "--ozone-platform=x11",
+        // 		">/dev/null", "2>&1",  nullptr);
+        execlp("chromium", "chromium", link.c_str(), ">/dev/null", "2>&1",
+               nullptr);
       } else if (child < 0) {
         sb.append("Failed to fork");
       }

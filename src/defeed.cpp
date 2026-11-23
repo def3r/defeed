@@ -37,11 +37,26 @@ void setupDirs() {
       std::exit(1);
     }
     if (not fs::create_directory(rss)) {
-      std::cerr << "Unable to create dir: " << defeed_dir << std::endl;
+      std::cerr << "Unable to create dir: " << rss << std::endl;
       std::exit(1);
     }
     std::ofstream rss_file{rss_xml};
     rss_file.close();
+
+    std::ofstream file{rss_xml};
+    file.close();
+
+    file.open(defeed_xml, std::ios_base::out | std::ios_base::trunc);
+    // TODO: Serialization
+    file << "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>\n";
+    file << "<defeed>\n";
+    file << "  <category>defeedtoplevel</category>\n";
+    file << "  <item>\n";
+    file << "    <display>Welcome to Defeeed, Press enter to checkout how to create the config!</display>\n";
+    file << "    <link>https://github.com/def3r/defeed/blob/main/readme.txt</link>\n";
+    file << "  </item>\n";
+    file << "</defeed>\n";
+    file.close();
   }
 }
 

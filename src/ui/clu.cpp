@@ -18,7 +18,7 @@ bool CmdLine::exec(std::string &cmd) {
     } else {
       DefeedCtx::shift_focus = true;
     }
-  } else if (cmd == "list" || cmd == "ls") {
+  } else if (cmd == "list" or cmd == "ls") {
     // nop
   } else if (cmd == "q") {
     DefeedCtx::quit = true;
@@ -84,7 +84,7 @@ void CmdLine::search_schemas(const PageID search_pid,
         }
       }
 
-      if (not s.hasPage() && s.find("file")) {
+      if (not s.hasPage() and s.find("file")) {
         // TODO: setting schema's pid should be PCB's responsibility
         s.pid = PCB::create(DefeedCtx::defeed + s.m.find("file")->second);
       }

@@ -5,8 +5,8 @@
 #include <libxml/HTMLtree.h>
 
 #include "global.h"
-#include "sb.h"
 #include "html.h"
+#include "sb.h"
 
 namespace HTML {
 
@@ -25,11 +25,11 @@ static Node makeLeaf(xmlNode *cur_node) {
     return nullptr;
   }
   Leaf leaf = std::make_shared<HTML::LeafBase>();
-  if (cur_node->type == HTML_TEXT_NODE && cur_node->content) {
+  if (cur_node->type == HTML_TEXT_NODE and cur_node->content) {
     // std::cout << "\t\tTEXT: " << cur_node->content << ": "
     //           << std::strlen((char *)cur_node->content) << std::endl;
     std::string content((char *)cur_node->content);
-    if (content.find_first_not_of(" \t\n\r") == std::string::npos ||
+    if (content.find_first_not_of(" \t\n\r") == std::string::npos or
         content.empty()) {
       return {};
     }

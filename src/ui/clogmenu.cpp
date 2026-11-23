@@ -34,20 +34,20 @@ Element LogMenuComponent::OnRender() {
 }
 
 bool LogMenuComponent::OnEvent(Event ev) {
-  if (Navigation::vim(ev, log_menu_idx, entries.size())) {
-    return true;
-  }
+  EVENT_HANDLER_PROLOGUE;
 
-  if (ev == Event::Character("q")) {
+  REGISTER("", Navigation::vim(ev, log_menu_idx, entries.size())) {}
+
+  REGISTER_CHAR("quit", q) {
     DefeedCtx::show_logs = false;
     DefeedCtx::shift_focus = true;
-    return true;
   }
 
-  if (ev == Event::CtrlK) {
+  REGISTER_EV("shift focus back to main list page", CtrlK) {
     DefeedCtx::shift_focus = true;
-    return true;
   }
+
+  EVENT_HANDLER_EPILOGUE;
 
   return ComponentBase::OnEvent(ev);
 }

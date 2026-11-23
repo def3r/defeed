@@ -145,7 +145,7 @@ Node Extract::make_leaf(xmlNode *cur_node) {
 }
 
 bool Extract::shouldBeInternal(std::string &name) {
-  return name == "item" || name == "image" || name == "channel";
+  return name == "item" or name == "image" or name == "channel";
 }
 
 Node Extract::make_internal(xmlNode *cur_node) {

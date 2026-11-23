@@ -1,4 +1,5 @@
 #include "defeed.h"
+#include "global.h"
 #include "ui.h"
 #include "uinav.h"
 
@@ -26,28 +27,28 @@ int Page::GetCurIndex() const { return selected; }
 int Page::GetMaxIndex() const { return max_entries; }
 
 bool Page::OnEvent(Event ev) {
-  if (Navigation::vim(ev, selected, max_entries)) {
-    return true;
-  }
+  EVENT_HANDLER_PROLOGUE;
+
+  REGISTER("", Navigation::vim(ev, selected, max_entries)) {}
 
   // TODO: Switch Request
-  if (ev == Event::Escape || ev == Event::Character('-')) {
+  REGISTER("Move back in history",
+           EVENT_IS(Escape) or EVENT_IS(Character('-'))) {
     DefeedCtx::switch_request = true;
     DefeedCtx::switch_type = DefeedCtx::SwitchPage::Backwards;
-    return true;
   }
 
-  if (ev == Event::Return) {
+  REGISTER_EV("Select current entry", Return) {
     DefeedCtx::switch_request = true;
     DefeedCtx::switch_type = DefeedCtx::SwitchPage::Forward;
-    return true;
   }
 
-  if (ev == Event::Character('+')) {
+  REGISTER_CHAR("Move forward in history", +) {
     DefeedCtx::switch_request = true;
     DefeedCtx::switch_type = DefeedCtx::SwitchPage::UndoBackwards;
-    return true;
   }
+
+  EVENT_HANDLER_EPILOGUE;
 
   return ComponentBase::OnEvent(ev);
 }

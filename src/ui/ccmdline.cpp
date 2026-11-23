@@ -1,4 +1,5 @@
 #include "defeed.h"
+#include "global.h"
 #include "ui.h"
 
 namespace UI {
@@ -20,19 +21,20 @@ bool CmdLineComponent::Focusable() const { return true; }
 Element CmdLineComponent::OnRender() { return Render(); }
 
 bool CmdLineComponent::OnEvent(Event ev) {
-  if (not DefeedCtx::isModeCmd() && not DefeedCtx::isModeSearch())
+  if (not DefeedCtx::isModeCmd() and not DefeedCtx::isModeSearch())
     return false;
 
-  if (ev == Event::Escape) {
+  EVENT_HANDLER_PROLOGUE;
+
+  REGISTER_EV("Leave to Normal mode", Escape) {
     if (DefeedCtx::isModeSearch()) {
       this->clunit->exit_search(ev);
     }
     DefeedCtx::mode = DefeedCtx::Mode::Normal;
     DefeedCtx::shift_focus = true;
-    return true;
   }
 
-  if (ev == Event::Return) {
+  REGISTER_EV("Execute and leave to Normal mode", Return) {
     if (DefeedCtx::isModeCmd()) {
       this->clunit->exec(cmd);
     } else if (DefeedCtx::isModeSearch()) {
@@ -41,14 +43,15 @@ bool CmdLineComponent::OnEvent(Event ev) {
       cmd = "";
     }
     DefeedCtx::mode = DefeedCtx::Mode::Normal;
-    return true;
   }
 
-  if (DefeedCtx::isModeSearch()) {
+  // TODO: empty string details for register means private registeration
+  REGISTER("", DefeedCtx::isModeSearch()) {
     ComponentBase::OnEvent(ev);
     this->clunit->search(cmd);
-    return true;
   }
+
+  EVENT_HANDLER_EPILOGUE;
 
   return ComponentBase::OnEvent(ev);
 }

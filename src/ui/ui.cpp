@@ -35,7 +35,7 @@ void App::begin_fetch() {
 }
 
 void App::switch_page(PageID pid) {
-  if (pid == -1 || active_pid == pid)
+  if (pid == -1 or active_pid == pid)
     return;
 
   std::shared_ptr<ListPage> lipg =
@@ -75,7 +75,7 @@ void App::switch_page() {
     // crashes
     Schema &s = PCB::getSchemaAt(active_pid, selected);
     if (s.hasPage()) {
-      if (DefeedCtx::refetch_rss && s.find("rss")) {
+      if (DefeedCtx::refetch_rss and s.find("rss")) {
         if (DefeedCtx::refetch_rss_map.find(std::hash<std::string>{}(
                 s.m["rss"])) == DefeedCtx::refetch_rss_map.end()) {
           // Rss feed was manually refetched and current entry hasn't been
@@ -161,6 +161,8 @@ void App::update_on_event() {
 bool App::OnEvent(Event ev) {
   update_on_event();
 
+  EVENT_HANDLER_PROLOGUE;
+
   if (not DefeedCtx::isModeNormal())
     return false;
 
@@ -170,34 +172,26 @@ bool App::OnEvent(Event ev) {
     return true;
   }
 
-  if (ev == Event::Character('q')) {
-    screen.ExitLoopClosure()();
-    return true;
-  }
+  REGISTER_CHAR("quit", q) { screen.ExitLoopClosure()(); }
 
-  if (ev == Event::Character('r')) {
-    begin_fetch();
-    return true;
-  }
+  REGISTER_CHAR("refetch rss", r) { begin_fetch(); }
 
-  if (ev == Event::Character('l')) {
+  REGISTER_CHAR("toggle logs", l) {
     DefeedCtx::show_logs = not DefeedCtx::show_logs;
     if (DefeedCtx::show_logs) {
       log->TakeFocus();
     } else {
       DefeedCtx::shift_focus = true;
     }
-    return true;
   }
 
-  if (ev == Event::Character(':')) {
+  REGISTER_CHAR("switch to cmd line mode", :) {
     DefeedCtx::mode = DefeedCtx::Mode::Cmd;
     cmd_line->TakeFocus(); // Forcefully give it to the input else we need to
                            // press down arrow key or `j`
-    return true;
   }
 
-  if (ev == Event::Character('/')) {
+  REGISTER_CHAR("switch to search mode", /) {
     DefeedCtx::mode = DefeedCtx::Mode::Search;
     // NOTE: We must inform the clunit about the PageID on which we want to call
     // the recursive search from, because the cureent pid will be replaced with
@@ -210,16 +204,16 @@ bool App::OnEvent(Event ev) {
     int selected = std::static_pointer_cast<ListPage>(page_list)->GetCurIndex();
     PageCtx &ctx = PCB::getRefTo(active_pid);
     ctx.selected = selected;
-    return true;
   }
 
   // NOTE: CtrlJ corresponds to "Return" in terminal
   // CtrlJ -> Line Feed
   // CtrlM -> Carriage Return
-  if (ev == Event::CtrlL && DefeedCtx::show_logs) {
+  REGISTER("switch focus from logs", EVENT_IS(CtrlL) and DefeedCtx::show_logs) {
     log->TakeFocus();
-    return true;
   }
+
+  EVENT_HANDLER_EPILOGUE;
 
   return false;
 }
@@ -242,7 +236,7 @@ App::App()
     status_line,
     Maybe(log, &DefeedCtx::show_logs)
       | size(ftxui::HEIGHT, ftxui::LESS_THAN, 10),
-    Maybe(cmd_line, [] { return DefeedCtx::isModeCmd() ||
+    Maybe(cmd_line, [] { return DefeedCtx::isModeCmd() or
                                 DefeedCtx::isModeSearch(); })
       | size(ftxui::HEIGHT, ftxui::EQUAL,     1),
   }, &active_page)
@@ -252,7 +246,7 @@ App::App()
 
 void App::event_loop() {
   Loop l(&screen, app);
-  while (not l.HasQuitted() && not DefeedCtx::quit) {
+  while (not l.HasQuitted() and not DefeedCtx::quit) {
     if (DefeedCtx::task == DefeedCtx::Task::Fetch) {
       switch (std::future_status status = f.wait_for(100ms); status) {
       case std::future_status::deferred:

@@ -26,3 +26,15 @@ inline void Assert(bool cond,
                    const std::string &msg = "no failure msg provided") {}
 
 } // namespace Utils
+
+#define REGISTER(details, ...)                                                 \
+  if ((not event_is_handled_) and __VA_ARGS__ and (event_is_handled_ = true))
+#define EVENT_IS(event) ev == Event::event
+
+#define REGISTER_CHAR(details, c) REGISTER(details, ev == Event::Character(#c))
+#define REGISTER_EV(details, event) REGISTER(details, ev == Event::event)
+
+#define EVENT_HANDLER_PROLOGUE bool event_is_handled_ = false
+#define EVENT_HANDLER_EPILOGUE                                                 \
+  if (event_is_handled_)                                                       \
+  return true

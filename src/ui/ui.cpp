@@ -56,7 +56,7 @@ void App::switch_page() {
   do {                                                                         \
     const PageID _new_active_pid = new_active_pid;                             \
     if (_new_active_pid != active_pid) {                                       \
-      if (!call_history_back.empty()) {                                        \
+      if (not call_history_back.empty()) {                                     \
         if (active_pid == call_history_back.top()) {                           \
           call_history_back.pop();                                             \
         } else {                                                               \

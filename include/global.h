@@ -28,7 +28,7 @@ inline void Assert(bool cond,
 } // namespace Utils
 
 #define REGISTER(details, ...)                                                 \
-  if ((not event_is_handled_) and __VA_ARGS__ and (event_is_handled_ = true))
+  if ((not event_is_handled_) and (__VA_ARGS__) and (event_is_handled_ = true))
 #define EVENT_IS(event) ev == Event::event
 
 #define REGISTER_CHAR(details, c) REGISTER(details, ev == Event::Character(#c))
@@ -36,5 +36,7 @@ inline void Assert(bool cond,
 
 #define EVENT_HANDLER_PROLOGUE bool event_is_handled_ = false
 #define EVENT_HANDLER_EPILOGUE                                                 \
-  if (event_is_handled_)                                                       \
-  return true
+  do {                                                                         \
+    if (event_is_handled_)                                                     \
+      return true;                                                             \
+  } while (0)

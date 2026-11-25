@@ -78,7 +78,7 @@ void App::switch_page() {
       }                                                                        \
       call_history.push(_active_pid);                                          \
       active_pid = *&_new_active_pid;                                          \
-      s.pid = _active_pid;                                                     \
+      s.pid = _new_active_pid;                                                 \
     }                                                                          \
     DefeedCtx::switch_request = false;                                         \
   } while (0)

@@ -86,7 +86,7 @@ PageID create(const Schemas &ss);
 PageID create(const Schemas &ss, const std::string &entry_key);
 
 // create a page using schema file name
-PageID create(const std::string fname);
+PageID create(const std::string &fname);
 
 // create a page using rss url, with display as entry_key
 PageID create(const std::string url, const std::string &entry_key);

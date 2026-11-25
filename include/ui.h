@@ -6,8 +6,8 @@
 #include <ftxui/component/app.hpp>
 #include <ftxui/component/component.hpp>
 
-#include "types.h"
 #include "page.h"
+#include "types.h"
 
 extern SharedBuffer sb;
 
@@ -23,6 +23,7 @@ struct CmdLine {
   Schemas search(const std::string &needle);
   void set_search_pid(const PageID pid);
   void exit_search(Event ev);
+  bool is_search_success();
 
 private:
   void search_schemas(const PageID search_pid, const std::string l_needle);
@@ -31,6 +32,7 @@ private:
   UI::App *parent = nullptr;
   PageID search_pid = -1;
   Schemas search_ss{};
+  bool searched = false; // at least 1 char has been searched
 };
 
 struct LoadingComponent : public ComponentBase {
@@ -63,6 +65,7 @@ struct CmdLineComponent : public ComponentBase {
 private:
   std::string cmd{};
   CmdLine *clunit = nullptr;
+  Color textcolor = Color::White;
 };
 
 struct Page : public ComponentBase, public MenuOption {
@@ -84,9 +87,9 @@ struct ListPage : public Page {
   explicit ListPage(const Schemas &ss, const std::string &entry_key);
   Element OnRender() override;
   Component update_entries(const PageID pid,
-                          const std::string &entry_key = "display");
+                           const std::string &entry_key = "display");
   Component update_entries(const Schemas &ss,
-                          const std::string &entry_key = "display");
+                           const std::string &entry_key = "display");
   Component update_entries(const Strings &entries);
   void update(Component child);
   void update(Component child, int selected, int max_entries);

@@ -8,8 +8,8 @@ using namespace ftxui;
 
 CmdLineComponent::CmdLineComponent(CmdLine *_Nonnull clunit) : clunit(clunit) {
   InputOption cmd_line_style = InputOption::Default();
-  cmd_line_style.transform = [](InputState state) {
-    state.element |= color(Color::White);
+  cmd_line_style.transform = [&](InputState state) {
+    state.element |= color(textcolor);
     return state.element;
   };
   Component input = Input(&cmd, cmd_line_style);
@@ -18,7 +18,16 @@ CmdLineComponent::CmdLineComponent(CmdLine *_Nonnull clunit) : clunit(clunit) {
 
 bool CmdLineComponent::Focusable() const { return true; }
 
-Element CmdLineComponent::OnRender() { return Render(); }
+Element CmdLineComponent::OnRender() {
+  if (DefeedCtx::isModeSearch()) {
+    if (clunit->is_search_success()) {
+      textcolor = Color::White;
+    } else {
+      textcolor = Color::OrangeRed1;
+    }
+  }
+  return Render();
+}
 
 bool CmdLineComponent::OnEvent(Event ev) {
   if (not DefeedCtx::isModeCmd() and not DefeedCtx::isModeSearch())

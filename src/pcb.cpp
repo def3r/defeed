@@ -14,7 +14,7 @@ PageID PCB::create(const Schemas &ss, const std::string &entry_key) {
   return pid;
 }
 
-PageID PCB::create(const std::string fname) {
+PageID PCB::create(const std::string &fname) {
   Schemas ss{};
   XML::Extract x{fname};
   x.extract();

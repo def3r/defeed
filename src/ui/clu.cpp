@@ -39,6 +39,7 @@ CmdLine::CmdLine(UI::App *_Nonnull parent) : parent(parent) {
 void CmdLine::set_search_pid(const PageID pid) {
   sb.append("Updated pid");
   this->search_pid = pid;
+  this->searched = false;
 }
 
 void CmdLine::exit_search(Event ev) {
@@ -57,6 +58,7 @@ void CmdLine::exit_search(Event ev) {
   }
   search_pid = -1;
   search_ss.clear();
+  searched = false;
 }
 
 Schemas CmdLine::search(const std::string &needle) {
@@ -76,6 +78,7 @@ Schemas CmdLine::search(const std::string &needle) {
   PageID temp_pid = PCB::Temp::create(search_ss, search_pid);
   lipg->update_entries(temp_pid);
   parent->active_pid = temp_pid;
+  searched = true;
 
   return search_ss;
 }
@@ -103,6 +106,10 @@ void CmdLine::search_schemas(const PageID search_pid,
     }
   }
   // TODO: Search in xml roots as well, when ss.size == 0
+}
+
+bool CmdLine::is_search_success() {
+  return not searched ? true : search_ss.size() > 0;
 }
 
 } // namespace UI

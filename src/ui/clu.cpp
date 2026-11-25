@@ -43,7 +43,15 @@ void CmdLine::set_search_pid(const PageID pid) {
 
 void CmdLine::exit_search(Event ev) {
   if (ev == Event::Return) {
-    parent->call_history.push(search_pid);
+    // If search page only contains 1 entry, open it by default
+    if (search_ss.size() == 1) {
+      DefeedCtx::switch_request = true;
+      DefeedCtx::switch_type = DefeedCtx::SwitchPage::Forward;
+      // no need to handle call history explicitly, swtich_request is going to
+      // handle it
+    } else {
+      parent->call_history.push(search_pid);
+    }
   } else if (ev == Event::Escape) {
     parent->switch_page(search_pid);
   }
@@ -65,7 +73,7 @@ Schemas CmdLine::search(const std::string &needle) {
 
   std::shared_ptr<ListPage> lipg =
       std::static_pointer_cast<ListPage>(parent->page_list);
-  PageID temp_pid = PCB::Temp::create(search_ss);
+  PageID temp_pid = PCB::Temp::create(search_ss, search_pid);
   lipg->update_entries(temp_pid);
   parent->active_pid = temp_pid;
 

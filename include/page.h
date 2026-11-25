@@ -62,7 +62,7 @@ struct Schema {
 
 // NOTE: toplevel page always has id = 0
 struct PageCtx {
-  PageID id = -1, pid = -1;
+  PageID ppid = -1, pid = -1;
 
   // A page can either hold ss, or root;
   // Order or evaluation:
@@ -103,7 +103,7 @@ UNUSED inline std::unordered_map<PageID, PageCtx> t_pctx{};
 inline PageCtx tp{};
 
 // create a temporary page using schema file name
-PageID create(const Schemas &ss);
+PageID create(const Schemas &ss, const PageID ppid);
 
 bool check(const PageID pid);
 

@@ -52,20 +52,33 @@ void App::switch_page() {
   PageCtx &ctx = PCB::getRefTo(active_pid);
   ctx.selected = selected;
 
+  // The macro of context switch completion:
+  // - a lil dereferencing an explicit reference to a local var (*&) hack is
+  // used to suppress warning in case of new_active_pid == active_pid
+  //
+  // - var _new_active_pid is used to suppress warning for != comparison (maybe
+  // redundant now that we have _active_pid var)
+  //
+  // - var _active_pid is used to handle auto page switch when temp search
+  // result page has 1 entry, and user presses Event::Return to exit the search
+  // mode. In case of a temp page, use parent pid to store call history
 #define SWITCH_EPILOGUE(new_active_pid)                                        \
   do {                                                                         \
     const PageID _new_active_pid = new_active_pid;                             \
-    if (_new_active_pid != active_pid) {                                       \
+    const PageID _active_pid = PCB::Temp::check(active_pid)                    \
+                                   ? PCB::getRefTo(active_pid).ppid            \
+                                   : active_pid;                               \
+    if (_new_active_pid != _active_pid) {                                      \
       if (not call_history_back.empty()) {                                     \
-        if (active_pid == call_history_back.top()) {                           \
+        if (_active_pid == call_history_back.top()) {                          \
           call_history_back.pop();                                             \
         } else {                                                               \
           call_history_back = {};                                              \
         }                                                                      \
       }                                                                        \
-      call_history.push(active_pid);                                           \
+      call_history.push(_active_pid);                                          \
       active_pid = *&_new_active_pid;                                          \
-      s.pid = active_pid;                                                      \
+      s.pid = _active_pid;                                                     \
     }                                                                          \
     DefeedCtx::switch_request = false;                                         \
   } while (0)

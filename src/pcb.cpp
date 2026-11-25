@@ -93,9 +93,9 @@ Schema &PCB::getSchemaAt(const PageID pid, const size_t index) {
   return PCB::pctx[pid].ss[index];
 }
 
-PageID PCB::Temp::create(const Schemas &ss) {
+PageID PCB::Temp::create(const Schemas &ss, const PageID ppid) {
   PageID pid = (1 << 31 | PCB::pctx.size());
-  tp = (PageCtx){.pid = pid, .ss = ss};
+  tp = (PageCtx){.ppid = ppid, .pid = pid, .ss = ss};
   return pid;
 }
 

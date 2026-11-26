@@ -112,6 +112,7 @@ size_t Fetcher::header_callback(char *buffer, size_t size, size_t nitems,
     return n;
   }
 
+  // TODO: use std::string
   char temp[n - 1]; // ignore \r\n
   std::memcpy(temp, buffer, n - 2);
   temp[n - 2] = '\0';

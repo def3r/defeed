@@ -32,6 +32,7 @@ void setupDirs() {
   fs::path defeed_dir{defeed};
   if (not fs::is_directory(defeed_dir)) {
     std::cout << "defeed dir not found, initializing defeed." << std::endl;
+    sb.append("defeed dir not found, initializing defeed.");
     if (not fs::create_directory(defeed_dir)) {
       std::cerr << "Unable to create dir: " << defeed_dir << std::endl;
       std::exit(1);
@@ -46,20 +47,12 @@ void setupDirs() {
     std::ofstream file{rss_xml};
     file.close();
 
-    file.open(defeed_xml, std::ios_base::out | std::ios_base::trunc);
-    // TODO: Serialization
-    file << "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>\n";
-    file << "<defeed>\n";
-    file << "  <category>defeedtoplevel</category>\n";
-    file << "  <item>\n";
-    file << "    <display>Welcome to Defeeed, Press enter to checkout how to "
-            "create the config!</display>\n";
-    file << "    "
-            "<link>https://github.com/def3r/defeed/blob/main/readme.txt</"
-            "link>\n";
-    file << "  </item>\n";
-    file << "</defeed>\n";
-    file.close();
+    XML::Root root = XML::Create::Root();
+    XML::Leaf category = XML::Create::Leaf("category", "defeedtoplevel");
+    XML::Leaf display = XML::Create::Leaf("display", "Welcome to Defeeed, Press enter to checkout how to create the config!");
+    XML::Leaf link = XML::Create::Leaf("link", "https://github.com/def3r/defeed/blob/main/readme.txt");
+    root << category << XML::Create::Internal("item", {display, link});
+    XML::Serialize(defeed_xml, root);
   }
 }
 

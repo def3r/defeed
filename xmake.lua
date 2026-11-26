@@ -14,6 +14,7 @@ add_packages("ftxui")
 add_syslinks("curl", "pthread", "ssl", "unwind", "crypto", "xml2")
 add_includedirs("include")
 add_includedirs("/usr/include/libxml2/")
+set_installdir(os.getenv("HOME") .. "/.local/")
 --
 -- If you want to known more usage about xmake, please see https://xmake.io
 --

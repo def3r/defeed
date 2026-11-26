@@ -38,6 +38,7 @@ bool CmdLineComponent::OnEvent(Event ev) {
   REGISTER_EV("Leave to Normal mode", Escape) {
     if (DefeedCtx::isModeSearch()) {
       this->clunit->exit_search(ev);
+      textcolor = Color::White;
     }
     DefeedCtx::mode = DefeedCtx::Mode::Normal;
     DefeedCtx::shift_focus = true;
@@ -50,6 +51,7 @@ bool CmdLineComponent::OnEvent(Event ev) {
       this->clunit->exit_search(ev);
       DefeedCtx::shift_focus = true;
       cmd = "";
+      textcolor = Color::White;
     }
     DefeedCtx::mode = DefeedCtx::Mode::Normal;
   }

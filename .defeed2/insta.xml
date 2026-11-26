@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<defeed>
+  <item>
+    <display>DM</display>
+    <link>https://www.instagram.com/direct/inbox/</link>
+  </item>
+  <item>
+    <display>People</display>
+    <file>insta_people.xml</file>
+  </item>
+  <item>
+    <display>Cartoonists</display>
+    <file>insta_cartoonists.xml</file>
+  </item>
+  <item>
+    <display>Satire</display>
+    <file>insta_satire.xml</file>
+  </item>
+  <item>
+    <display>Programming</display>
+    <file>insta_prog.xml</file>
+  </item>
+</defeed>

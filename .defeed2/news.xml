@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<defeed>
+  <category>news</category>
+  <item>
+    <display>Newslaundry</display>
+    <link>https://www.newslaundry.com/</link>
+    <rss>https://www.newslaundry.com/stories.rss?time-period=last-7-days&amp;exclude-section-ids=15848,15817</rss>
+    <yt>https://www.youtube.com/user/newslaundry</yt>
+    <newsletter>https://www.newslaundry.com/newsletter-signup</newsletter>
+  </item>
+
+  <item>
+    <display>News Minute</display>
+    <link>https://www.thenewsminute.com/</link>
+    <yt>https://www.youtube.com/channel/UCspQie3i29iIFbCgfGisO9Q</yt>
+  </item>
+
+  <item>
+    <display>Scroll.in</display>
+    <link>https://scroll.in/</link>
+    <yt>https://www.youtube.com/@ScrollIn</yt>
+    <rss>https://scrollnewsletter.substack.com/</rss>
+  </item>
+
+  <item>
+    <display>Ground news</display>
+    <link>https://ground.news/newsletters/daily-ground</link>
+  </item>
+
+  <item>
+    <display>Dekoder ai</display>
+    <link>https://www.dekoder.com/</link>
+  </item>
+
+  <item>
+    <display>The quint</display>
+    <link>https://www.thequint.com/</link>
+    <newsletter>https://www.thequint.com/subscribe</newsletter>
+  </item>
+
+  <item>
+    <display>InternetFreedom.in</display>
+    <link>https://www.instagram.com/internetfreedom.in</link>
+    <rss>https://internetfreedom.in/rss</rss>
+    <substack>https://substack.com/@internetfreedom</substack>
+    <yt>https://www.youtube.com/@InternetFreedomFoundation</yt>
+  </item>
+
+  <item>
+    <display>Shyam Meera Singh</display>
+    <link>https://www.instagram.com/shyammeerasingh</link>
+    <yt>https://www.youtube.com/@shyammeerasingh1</yt>
+  </item>
+
+  <item>
+    <display>Ajit Anjum</display>
+    <link>https://www.instagram.com/ajitanjum</link>
+    <yt>https://www.youtube.com/@AjitAnjumOfficial</yt>
+  </item>
+
+  <item>
+    <display>Peek TV</display>
+    <link>https://www.instagram.com/peektv_in</link>
+    <yt>https://www.youtube.com/@PeekTVOfficial</yt>
+  </item>
+
+  <item>
+    <display>Bar n Bench</display>
+    <link>https://www.instagram.com/barandbench</link>
+    <web>https://www.barandbench.com/</web>
+  </item>
+
+  <item>
+    <display>Woke on paper</display>
+    <link>https://www.instagram.com/wokeonpaper</link>
+    <web>https://wokeonpaper.in/stories</web>
+  </item>
+
+  <item>
+    <display>Reporters collective</display>
+    <link>https://www.instagram.com/reporterscollective</link>
+    <web>https://www.reporters-collective.in/</web>
+    <newsletter>https://www.reporters-collective.in/newsletters</newsletter>
+    <linktree>https://linktr.ee/thereporterscollective</linktree>
+  </item>
+
+  <item>
+    <display>Perfect Union</display>
+    <link>https://www.instagram.com/perfectunion</link>
+    <yt>https://www.youtube.com/channel/UCehBVAPy-bxmnbNARF-_tvA</yt>
+    <rss>https://substack.perfectunion.us/</rss>
+  </item>
+
+  <item>
+    <display>Dem Socialists</display>
+    <link>https://www.instagram.com/demsocialists</link>
+    <web>https://democraticleft.dsausa.org/</web>
+    <newsletter>https://democraticleft.dsausa.org/newsletter/</newsletter>
+  </item>
+
+</defeed>

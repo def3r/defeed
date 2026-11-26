@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<defeed>
+  <category>rss</category>
+  <item>
+    <display>Daniel Stenberg ($link)</display>
+    <rss>https://daniel.haxx.se/blog/feed/</rss>
+  </item>
+  <item>
+    <display>XKCD ($rss)</display>
+    <rss>https://xkcd.com/rss.xml</rss>
+  </item>
+  <item>
+    <display>Sean Allen ($rss)</display>
+    <rss>https://www.seantallen.com/index.xml</rss>
+  </item>
+  <item>
+    <display>Mo ($rss)</display>
+    <rss>https://mo.io/rss.xml</rss>
+  </item>
+</defeed>
+

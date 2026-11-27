@@ -27,6 +27,7 @@ struct CurlGlobal {
     ccleanup = true;
   }
 
-private:
-  inline CurlGlobal() {};
+  inline CurlGlobal() { init(); }
+
+  inline ~CurlGlobal() { cleanup(); }
 };

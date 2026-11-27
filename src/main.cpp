@@ -2,6 +2,7 @@
 #include "defeed.h"
 #include "sb.h"
 #include "ui.h"
+#include <fstream>
 
 // Global Shared Buffer
 SharedBuffer sb{};

@@ -20,6 +20,10 @@ bool CmdLine::exec(std::string &cmd) {
     }
   } else if (cmd == "list" or cmd == "ls") {
     // nop
+  } else if (cmd == "export") {
+    // TODO: catch for errors while writing config_export.cpp
+    DefeedCtx::ConfigWriter cfw{DefeedCtx::defeed + "config_export.cpp"};
+    sb.append("Exported current config to " + DefeedCtx::defeed + "config_export.cpp");
   } else if (cmd == "q") {
     DefeedCtx::quit = true;
   } else if (cmd == "fetch") {

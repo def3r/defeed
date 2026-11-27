@@ -18,10 +18,12 @@ set_installdir(os.getenv("HOME") .. "/.local/")
 
 target("config")
 set_kind("binary")
-add_files(".defeed/*.cpp")
+add_files("config/*.cpp")
 add_syslinks("curl", "pthread", "ssl", "unwind", "crypto", "xml2")
 add_includedirs("include")
 add_includedirs("/usr/include/libxml2/")
+add_files("src/xml.cpp");
+add_files("src/html.cpp");
 --
 -- If you want to known more usage about xmake, please see https://xmake.io
 --

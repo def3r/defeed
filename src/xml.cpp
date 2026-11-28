@@ -172,33 +172,32 @@ Node Extract::make_internal(xmlNode *cur_node) {
 }
 
 namespace Create {
-  XML::Internal Root() {
-    return std::make_shared<InternalBase>();
-  }
+XML::Internal Root() { return std::make_shared<InternalBase>(); }
 
-  XML::Leaf Leaf(const std::string& tag, const std::string& text) {
-    XML::Leaf leaf = std::make_shared<LeafBase>();
-    leaf->content = text; 
-    leaf->attrs["__self__"] = tag; // py moment
-    return leaf;
-  }
-
-  XML::Internal Internal(const std::string& tag, const std::vector<XML::Leaf>& children) {
-    XML::Internal node = std::make_shared<InternalBase>();
-    for (auto& leaf : children) {
-      node->children[leaf->attrs["__self__"]].push_back(leaf);
-    }
-    node->attrs["__self__"] = tag; // py moment
-    return node;
-  }
+XML::Leaf Leaf(const std::string &tag, const std::string &text) {
+  XML::Leaf leaf = std::make_shared<LeafBase>();
+  leaf->content = text;
+  leaf->attrs["__self__"] = tag; // py moment
+  return leaf;
 }
+
+XML::Internal Internal(const std::string &tag,
+                       const std::vector<XML::Leaf> &children) {
+  XML::Internal node = std::make_shared<InternalBase>();
+  for (auto &leaf : children) {
+    node->children[leaf->attrs["__self__"]].push_back(leaf);
+  }
+  node->attrs["__self__"] = tag; // py moment
+  return node;
+}
+} // namespace Create
 
 // clang-format off
 #define TAG_START(tag, indent) fs << indent << "<"  << tag << ">"
 #define TAG_END(tag, indent)   fs << indent << "</" << tag << ">"
 // clang-format on
 
-void SerializeInternal(std::ofstream& fs, Internal root, const size_t indent) {
+void SerializeInternal(std::ofstream &fs, Internal root, const size_t indent) {
   std::string indent_str(indent, ' ');
   for (auto &[tag, sibs] : root->children) {
     for (Node sib : sibs) {
@@ -209,7 +208,8 @@ void SerializeInternal(std::ofstream& fs, Internal root, const size_t indent) {
         TAG_END(tag, "");
       } else if (sib->type == NodeType::Internal) {
         TAG_START(tag, indent_str) << "\n";
-        SerializeInternal(fs, std::static_pointer_cast<InternalBase>(sib), indent + 2);
+        SerializeInternal(fs, std::static_pointer_cast<InternalBase>(sib),
+                          indent + 2);
         TAG_END(tag, indent_str);
       }
       fs << "\n";
@@ -217,9 +217,10 @@ void SerializeInternal(std::ofstream& fs, Internal root, const size_t indent) {
   }
 }
 
-void Serialize(const std::string& file, Root root, const std::string& toptag /*"defeed"*/) {
+void Serialize(const std::string &file, Root root,
+               const std::string &toptag /*"defeed"*/) {
   std::ofstream fs{file, std::ios_base::out | std::ios_base::trunc};
-  fs << "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>\n"; 
+  fs << "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>\n";
   TAG_START(toptag, "") << "\n";
   SerializeInternal(fs, root, 2);
   TAG_END(toptag, "") << "\n";
@@ -229,19 +230,20 @@ void Serialize(const std::string& file, Root root, const std::string& toptag /*"
 #undef TAG_END
 #undef TAG_START
 
-void operator<< (Node node, const std::string& text) {
-  Utils::Assert(node->type == NodeType::Leaf, "operator<<(string) must be used on leaf");
+void operator<<(Node node, const std::string &text) {
+  Utils::Assert(node->type == NodeType::Leaf,
+                "operator<<(string) must be used on leaf");
   Leaf leaf = std::static_pointer_cast<LeafBase>(node);
   leaf->content = text;
 }
 
-Internal& operator<< (Internal& node, Leaf leaf) {
+Internal &operator<<(Internal &node, Leaf leaf) {
   const std::string tag = leaf->attrs["__self__"];
   node->children[tag].push_back(std::static_pointer_cast<NodeBase>(leaf));
   return node;
 }
 
-Internal& operator<< (Internal& node, Internal child) {
+Internal &operator<<(Internal &node, Internal child) {
   const std::string tag = child->attrs["__self__"];
   node->children[tag].push_back(std::static_pointer_cast<NodeBase>(child));
   return node;

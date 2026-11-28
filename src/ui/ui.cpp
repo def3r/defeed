@@ -1,3 +1,4 @@
+#include <cstdlib>
 #include <future>
 #include <iostream>
 #include <memory>
@@ -12,6 +13,8 @@
 #include "sb.h"
 #include "ui.h"
 
+#include <dlfcn.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 using namespace std::chrono_literals;
@@ -280,6 +283,40 @@ void App::event_loop() {
 
     if (DefeedCtx::switch_request) {
       switch_page();
+    }
+
+    if (DefeedCtx::import_pid != -1) {
+      int status = 0;
+      pid_t res = waitpid(DefeedCtx::import_pid, &status, WNOHANG);
+      if (res == -1) {
+        sb.append("Error occured while waiting for pid=" +
+                  std::to_string(DefeedCtx::import_pid));
+        DefeedCtx::import_pid = -1;
+      } else if (res == DefeedCtx::import_pid) {
+        sb.append("clang++ created the so! ret status=" +
+                  std::to_string(status));
+        DefeedCtx::import_pid = -1;
+
+        void *handle = dlopen((DefeedCtx::defeed + "export.so").c_str(),
+                              RTLD_NOW | RTLD_GLOBAL | RTLD_DEEPBIND);
+        if (handle == nullptr) {
+          sb.append("error loading so: " + DefeedCtx::defeed + "export.so");
+          char *error = dlerror();
+          sb.append("dlsym error: " + std::string(error));
+        } else {
+          int (*main_fn)(void);
+          main_fn = (decltype(main_fn))dlsym(handle, "main");
+          char *error = dlerror();
+          if (error != nullptr) {
+            sb.append("dlsym error: " + std::string(error));
+          } else {
+            sb.append("calling func main");
+            main_fn();
+            sb.append("func done!");
+          }
+          dlclose(handle);
+        }
+      }
     }
 
     screen.RequestAnimationFrame();

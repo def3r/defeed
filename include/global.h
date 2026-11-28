@@ -27,6 +27,7 @@ inline void Assert(bool cond,
 
 } // namespace Utils
 
+
 #define REGISTER(details, ...)                                                 \
   if ((not event_is_handled_) and (__VA_ARGS__) and (event_is_handled_ = true))
 #define EVENT_IS(event) ev == Event::event

@@ -1,13 +1,11 @@
 #pragma once
 
+#include <fstream>
 #include <memory>
 #include <string>
 #include <unordered_map>
 #include <variant>
 #include <vector>
-#include <iostream>
-#include <fstream>
-#include <sstream>
 
 #include <libxml/parser.h>
 #include <libxml/tree.h>
@@ -105,16 +103,18 @@ private:
 };
 
 namespace Create {
-  XML::Internal Root();
-  XML::Internal Internal(const std::string& tag, const std::vector<XML::Leaf>& children);
-  XML::Leaf Leaf(const std::string& tag, const std::string& text);
-}
+XML::Internal Root();
+XML::Internal Internal(const std::string &tag,
+                       const std::vector<XML::Leaf> &children);
+XML::Leaf Leaf(const std::string &tag, const std::string &text);
+} // namespace Create
 
 //
 // Serialization
 //
-void SerializeInternal(std::ofstream& fs, Internal root, const size_t indent);
-void Serialize(const std::string& file, Root root, const std::string& toptag = "defeed");
+void SerializeInternal(std::ofstream &fs, Internal root, const size_t indent);
+void Serialize(const std::string &file, Root root,
+               const std::string &toptag = "defeed");
 
 //
 // Cast from shared_ptr<NodeBase> to
@@ -146,9 +146,9 @@ inline XML::LeafBase *cast_LeafBase(const XML::Node &FROM_NODE) {
 //
 // Operator Overloading
 //
-void operator<< (Node node, const std::string& text);
-Internal& operator<< (Internal& node, Leaf leaf);
-Internal& operator<< (Internal& node, Internal child);
+void operator<<(Node node, const std::string &text);
+Internal &operator<<(Internal &node, Leaf leaf);
+Internal &operator<<(Internal &node, Internal child);
 
 // Helpful util
 inline void mustContain(Children &children, const std::string &key) {

@@ -2,10 +2,11 @@
 #include "defeed.h"
 #include "sb.h"
 #include "ui.h"
-#include <fstream>
 
 // Global Shared Buffer
 SharedBuffer sb{};
+
+extern "C" void write_to_sb(int a) { sb.append(a); }
 
 int main(int argc, char *argv[]) {
   CurlGlobal defeed_curl{};
@@ -15,6 +16,8 @@ int main(int argc, char *argv[]) {
   // Main Thread
   UI::App defeed{};
   defeed.event_loop();
+
+  write_to_sb(12); // a call so that compiler doesn't optimize it out
 }
 
 // BUG: mcyoung and stephendeihl fetched xml is entity encoded?
